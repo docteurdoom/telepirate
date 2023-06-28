@@ -40,7 +40,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
             bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
         }
         Command::Mp3(link) => {
-            pirate::mp3(&link[..]);
+            pirate::mp3(&link[..]).await;
         }
     };
 
