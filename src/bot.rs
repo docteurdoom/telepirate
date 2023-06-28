@@ -44,7 +44,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     Ok(())
 }
 
-pub async fn run(bot: Bot) {
+pub async fn run() {
     match init().await {
         Ok(bot) => {
             Command::repl(bot, answer).await;

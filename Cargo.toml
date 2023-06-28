@@ -17,7 +17,6 @@ codegen-units = 1
 [dependencies]
 colored = { version = "2.0.0", features = ["no-color"] }
 fern = { version = "0.6.2", features = ["colored"] }
-humantime = "2.1.0"
 log = "0.4.19"
 ngrok = { version = "0.12.4", features = ["axum"] }
 teloxide = { version = "0.12.2", features = ["webhooks-axum", "macros"] }
