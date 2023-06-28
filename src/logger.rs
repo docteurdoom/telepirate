@@ -28,6 +28,7 @@ pub fn init() {
         .level_for("hyper", log::LevelFilter::Error)
         .level_for("reqwest", log::LevelFilter::Error)
         .level_for("want", log::LevelFilter::Error)
+        .level_for("teloxide", log::LevelFilter::Error)
         .chain(std::io::stdout())
         .chain(fern::log_file("debug.log").unwrap())
         .apply().unwrap();

@@ -1,15 +1,16 @@
 use teloxide::{prelude::*, update_listeners::webhooks, utils::command::BotCommands};
 use ngrok::prelude::*;
 use teloxide::Bot;
+use crate::pirate;
 use std::error::Error;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "These commands are supported:")]
 enum Command {
-    #[command(description = "Display help.")]
+    #[command(description = "display this help.")]
     Help,
-    //#[command(description = "Download an mp3 file from the provided link.")]
-    //Mp3(String),
+    #[command(description = "download an mp3 file from the provided link.")]
+    Mp3(String),
 }
 
 pub async fn init() -> Result<Bot, Box<dyn Error>> {
@@ -38,7 +39,9 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
         }
-        //Command::Mp3(link) => {}
+        Command::Mp3(link) => {
+            pirate::mp3(&link[..]);
+        }
     };
 
     Ok(())
