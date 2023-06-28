@@ -8,5 +8,5 @@ mod bot;
 async fn main() {
     logger::init();
     info!("Starting up ...");
-    bot::run();
+    bot::run().await;
 }
