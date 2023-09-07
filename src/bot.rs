@@ -98,7 +98,11 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         if files.botfiles.len() != 0 {
             for file in files.botfiles.into_iter() {
                 info!("Sending the {} ...", filetype.as_str());
-                bot.send_audio(msg.chat.id, file).await?;
+                match &filetype {
+                    FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
+                    FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
+                    _ => {}
+                }
             }
             database::intodb(msg.chat.id, msg.id, db);
             database::intodb(msg.chat.id, message.id, db);
