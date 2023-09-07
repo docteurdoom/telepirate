@@ -1,3 +1,6 @@
 /target
 /downloads
 /debug.log
+/database
+/src/debug.log
+/.idea
