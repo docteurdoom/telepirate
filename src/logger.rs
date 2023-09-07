@@ -1,35 +1,44 @@
+// cargo add log humantime && cargo add colored -F no-color && cargo add fern -F colored
+// Must be used globally in root:
+// #[macro_use] extern crate log;
+// pub const CRATE_NAME: &str = module_path!();
+
 use fern::colors::{Color, ColoredLevelConfig};
 use std::time::SystemTime;
+use humantime::format_rfc3339_seconds as timestamp;
 use fern;
+use crate::CRATE_NAME;
 
 pub fn init() {
     let colors = ColoredLevelConfig::new()
     .info(Color::Green)
     .debug(Color::Magenta)
-    .trace(Color::Blue);
-    
+    .trace(Color::Blue)
+    .warn(Color::Yellow)
+    .error(Color::Red);
+
     fern::Dispatch::new()
         .format(move |out, message, record| {
+            let mut level = colors.color(record.level()).to_string();
+            let mut time = timestamp(SystemTime::now())
+                .to_string()
+                .replace("T", " ")
+                .replace("Z", "");
+            if level.len() == 13 {
+                level += " ";
+            }
             out.finish(format_args!(
                 "[ {} {} ] {}",
-                colors.color(record.level()),
-                record.target(),
+                time,
+                level,
+                //record.target(),
                 message
             ))
         })
-        .level(log::LevelFilter::Trace)
-        .level_for("rustls", log::LevelFilter::Error)
-        .level_for("tracing", log::LevelFilter::Error)
-        .level_for("ngrok", log::LevelFilter::Error)
-        .level_for("muxado", log::LevelFilter::Error)
-        .level_for("tokio", log::LevelFilter::Error)
-        .level_for("tokio_util", log::LevelFilter::Error)
-        .level_for("mio", log::LevelFilter::Error)
-        .level_for("hyper", log::LevelFilter::Error)
-        .level_for("reqwest", log::LevelFilter::Error)
-        .level_for("want", log::LevelFilter::Error)
-        .level_for("teloxide", log::LevelFilter::Error)
+        .level(log::LevelFilter::Off)
+        .level_for(CRATE_NAME.replace("-", "_"), log::LevelFilter::Trace)
         .chain(std::io::stdout())
         .chain(fern::log_file("debug.log").unwrap())
         .apply().unwrap();
+    info!("Starting up ...");
 }
