@@ -1,0 +1,16 @@
+[Unit]
+Description=TelePirate bot
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/telepirate
+EnvironmentFile=/opt/telepirate/env
+
+User=root
+
+Restart=always
+
+ExecStart=/opt/telepirate/telepirate
+
+[Install]
+WantedBy=multi-user.target
