@@ -152,6 +152,7 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         Command::C => {
             database::intodb(msg.chat.id, msg.id, db);
             purge_trash_messages(msg.chat.id, db, &bot).await?;
+            debug!("User @{} has /c'leaned up the chat", getuser(&msg));
         }
     };
 
