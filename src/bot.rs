@@ -1,12 +1,20 @@
-use teloxide::{prelude::*, update_listeners::webhooks, utils::command::BotCommands};
 use ngrok::prelude::*;
-use teloxide::Bot;
+use teloxide::{
+    dispatching::{dialogue, dialogue::InMemStorage, UpdateHandler},
+    prelude::*,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup},
+    utils::command::BotCommands,
+    update_listeners::webhooks,
+};
+use dptree::case;
 use crate::{pirate, misc, database};
 use std::error::Error;
 use teloxide::types::ChatKind;
 use sled::Db;
 use crate::misc::cleanup;
 use crate::pirate::{FileType, Subject};
+
+type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "These commands are supported:")]
@@ -23,7 +31,7 @@ enum Command {
     C,
 }
 
-pub async fn init() -> Result<Bot, Box<dyn Error>> {
+async fn init() -> Result<Bot, Box<dyn Error>> {
     ctrlc::set_handler(move || {
         misc::r();
         info!("Stopping ...");
@@ -49,6 +57,82 @@ pub async fn init() -> Result<Bot, Box<dyn Error>> {
         .await?;
     Ok(bot)
 }
+
+pub async fn run() {
+    match init().await {
+        Ok(bot) => {
+            info!("Connection has been established.");
+            //Command::repl(bot, answer).await;
+            dispatcher(bot).await;
+        }
+        Err(reason) => {
+            dbg!(reason);
+        }
+    }
+}
+
+async fn dispatcher(bot: Bot) {
+    Dispatcher::builder(bot, handler().await)
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
+}
+
+async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let db = &database::init();
+    let help = move |bot: Bot, msg: Message| async move {
+
+    };
+
+    let command_handler = teloxide::filter_command::<Command, _>()
+        .branch(case![Command::Start].endpoint(start))
+        .branch(case![Command::Help].endpoint(help));
+
+    let message_handler = Update::filter_message()
+        .branch(command_handler);
+
+    return message_handler;
+}
+
+async fn start(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let message: Message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
+    database::intodb(msg.chat.id, msg.id, db);
+    database::intodb(msg.chat.id, message.id, db);
+    debug!("User @{} has /start'ed the bot", getuser(&message));
+    Ok(())
+}
+
+async fn help(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
+        database::intodb(msg.chat.id, msg.id, db);
+        database::intodb(msg.chat.id, message.id, db);
+        debug!("User @{} asked for /help", getuser(&message));
+        Ok(())
+}
+
+/*async fn mp3(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let db = &database::init();
+    let filetype = FileType::Mp3;
+    process_request(link, filetype, bot, msg, db).await;
+    Ok(())
+}
+
+async fn mp4(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let db = &database::init();
+    let filetype = FileType::Mp4;
+    process_request(link, filetype, bot, msg, db).await;
+    Ok(())
+}*/
+
+async fn clear(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let db = &database::init();
+    database::intodb(msg.chat.id, msg.id, db);
+    purge_trash_messages(msg.chat.id, db, &bot).await?;
+    debug!("User @{} has /c'leaned up the chat", getuser(&msg));
+    Ok(())
+}
+
 
 fn getuser(msg: &Message) -> String {
     let chatkind = &msg.chat.kind;
@@ -126,7 +210,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
     Ok(())
 }
 
-async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
+/*async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     let db = &database::init();
     match cmd {
         Command::Start => {
@@ -157,16 +241,4 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     };
 
     Ok(())
-}
-
-pub async fn run() {
-    match init().await {
-        Ok(bot) => {
-            info!("Connection has been established.");
-            Command::repl(bot, answer).await;
-        }
-        Err(reason) => {
-            dbg!(reason);
-        }
-    }
-}
+}*/
