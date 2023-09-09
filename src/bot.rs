@@ -62,7 +62,6 @@ pub async fn run() {
     match init().await {
         Ok(bot) => {
             info!("Connection has been established.");
-            //Command::repl(bot, answer).await;
             dispatcher(bot).await;
         }
         Err(reason) => {
@@ -81,13 +80,13 @@ async fn dispatcher(bot: Bot) {
 
 async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
     let db = &database::init();
-    let help = move |bot: Bot, msg: Message| async move {
-
-    };
 
     let command_handler = teloxide::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
-        .branch(case![Command::Help].endpoint(help));
+        .branch(case![Command::Help].endpoint(help))
+        .branch(case![Command::Mp3(link)].endpoint(mp3))
+        .branch(case![Command::Mp4(link)].endpoint(mp4))
+        .branch(case![Command::C].endpoint(clear));
 
     let message_handler = Update::filter_message()
         .branch(command_handler);
@@ -96,40 +95,42 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
 }
 
 async fn start(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let db = &database::init();
     let message: Message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
     database::intodb(msg.chat.id, msg.id, db);
     database::intodb(msg.chat.id, message.id, db);
-    debug!("User @{} has /start'ed the bot", getuser(&message));
+    info!("User @{} has /start'ed the bot", getuser(&message));
     Ok(())
 }
 
 async fn help(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+    let db = &database::init();
     let message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
         database::intodb(msg.chat.id, msg.id, db);
         database::intodb(msg.chat.id, message.id, db);
-        debug!("User @{} asked for /help", getuser(&message));
+        info!("User @{} asked for /help", getuser(&message));
         Ok(())
 }
 
-/*async fn mp3(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+async fn mp3(link: String, bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
     let db = &database::init();
     let filetype = FileType::Mp3;
     process_request(link, filetype, bot, msg, db).await;
     Ok(())
 }
 
-async fn mp4(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
+async fn mp4(link: String, bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
     let db = &database::init();
     let filetype = FileType::Mp4;
     process_request(link, filetype, bot, msg, db).await;
     Ok(())
-}*/
+}
 
 async fn clear(bot: Bot, msg: Message, cmd: Command) -> HandlerResult {
     let db = &database::init();
     database::intodb(msg.chat.id, msg.id, db);
     purge_trash_messages(msg.chat.id, db, &bot).await?;
-    debug!("User @{} has /c'leaned up the chat", getuser(&msg));
+    info!("User @{} has /c'leaned up the chat", getuser(&msg));
     Ok(())
 }
 
@@ -157,10 +158,11 @@ fn link_is_valid(link: &str) -> bool {
     link.len() != 0
 }
 
-pub async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseResult<()> {
-    trace!("Deleting garbage messages ...");
+async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseResult<()> {
     let ids = database::get_trash_message_ids(chatid, db).unwrap();
+    dbg!(&ids);
     for id in ids.into_iter() {
+        trace!("Deleting Message ID {} from Chat {} ...", id.0, chatid.0);
         bot.delete_message(chatid, id).await?;
     }
     db.remove(chatid.to_string());
@@ -170,9 +172,8 @@ pub async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> Respons
 async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Message, db: &Db) -> ResponseResult<()> {
     if link_is_valid(&link) {
         let message = bot.send_message(msg.chat.id, "Please wait ...").await?;
-        debug!("User @{} asked for /{}", getuser(&message), filetype.as_str());
+        info!("User @{} asked for /{}", getuser(&message), filetype.as_str());
         let mut files = Subject::default();
-        let mut correct_usage = String::new();
         match &filetype {
             FileType::Mp3 => { files = pirate::mp3(&link[..]).await; }
             FileType::Mp4 => { files = pirate::mp4(&link[..]).await; }
@@ -181,17 +182,17 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
 
         if files.botfiles.len() != 0 {
             for file in files.botfiles.into_iter() {
-                info!("Sending the {} ...", filetype.as_str());
+                trace!("Sending the {} ...", filetype.as_str());
                 match &filetype {
                     FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
                     FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
                     _ => {}
                 }
             }
+            info!("Files have been delivered.");
             database::intodb(msg.chat.id, msg.id, db);
             database::intodb(msg.chat.id, message.id, db);
             purge_trash_messages(msg.chat.id, db, &bot).await?;
-            trace!("Cleaning up files");
             cleanup(files.paths);
         } else {
             let error_msg = bot.send_message(msg.chat.id, "Error. Can't download.").await?;
@@ -209,36 +210,3 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
     }
     Ok(())
 }
-
-/*async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    let db = &database::init();
-    match cmd {
-        Command::Start => {
-            let message: Message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
-            debug!("User @{} has /start'ed the bot", getuser(&message));
-        }
-        Command::Help => {
-            let message = bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
-            debug!("User @{} asked for /help", getuser(&message));
-        }
-        Command::Mp3(link) => {
-            let filetype = FileType::Mp3;
-            process_request(link, filetype, bot, msg, db).await;
-        }
-        Command::Mp4(link) => {
-            let filetype = FileType::Mp4;
-            process_request(link, filetype, bot, msg, db).await;
-        }
-        Command::C => {
-            database::intodb(msg.chat.id, msg.id, db);
-            purge_trash_messages(msg.chat.id, db, &bot).await?;
-            debug!("User @{} has /c'leaned up the chat", getuser(&msg));
-        }
-    };
-
-    Ok(())
-}*/

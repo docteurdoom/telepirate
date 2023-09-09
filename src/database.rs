@@ -22,7 +22,7 @@ fn deserialize(x: impl Into<String>) -> Vec<i32> {
 pub fn intodb(chatid: ChatId, msgid: MessageId, db: &Db) -> Result<(), Error> {
     let chat: String = chatid.0.to_string();
     let mid = msgid.0;
-    trace!("Recording message ID {} from Chat {} into DB.", mid, &chat);
+    trace!("Recording message ID {} from Chat {} into DB ...", mid, &chat);
     let values = db.get(&chat)?;
     match values {
         None => {
