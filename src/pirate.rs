@@ -22,9 +22,9 @@ pub type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
 
 impl FileType {
     fn determine(args: &Vec<Arg>) -> Self {
-        return if args.len() == 8 {
+        return if args.len() == 7 {
             FileType::Mp3
-        } else if args.len() == 6 {
+        } else if args.len() == 5 {
             FileType::Mp4
         } else {
             error!("Unknown FileType!");
@@ -46,7 +46,6 @@ impl FileType {
 pub fn mp3(link: String) -> SubjectResult {
     let mp3args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
-        Arg::new("--restrict-filenames"),
         Arg::new("--windows-filenames"),
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
@@ -61,7 +60,6 @@ pub fn mp3(link: String) -> SubjectResult {
 pub fn mp4(link: String) -> SubjectResult {
     let mp4args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
-        Arg::new("--restrict-filenames"),
         Arg::new("--windows-filenames"),
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
