@@ -20,7 +20,7 @@ pub fn init() {
     fern::Dispatch::new()
         .format(move |out, message, record| {
             let mut level = colors.color(record.level()).to_string();
-            let mut time = timestamp(SystemTime::now())
+            let time = timestamp(SystemTime::now())
                 .to_string()
                 .replace("T", " ")
                 .replace("Z", "");

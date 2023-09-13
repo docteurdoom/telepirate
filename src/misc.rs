@@ -2,7 +2,7 @@ use terminal_size::{terminal_size};
 use crossterm::{ExecutableCommand, cursor};
 use std::io::{Write, stdout};
 use std::fs::remove_dir_all;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub fn r() {
     let size = terminal_size().unwrap().0.0;
@@ -18,7 +18,7 @@ pub fn update() {
 }
 
 pub fn cleanup(paths: Vec<PathBuf>) {
-    trace!("Cleaning up the files ...");
+    trace!("Cleaning up the working directory ...");
     paths.into_iter().for_each(
         |mut location| {
             location.pop();

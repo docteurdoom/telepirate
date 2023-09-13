@@ -1,11 +1,12 @@
 use sled::{Db, Error};
 use std::str::from_utf8 as bts;
-use serde::Deserialize;
 use teloxide::types::{ChatId, MessageId};
 
-pub fn init() -> Db {
-    debug!("Initializing database ...");
-    let db = sled::open("database/").unwrap();
+pub fn init(chat: ChatId) -> Db {
+    let id = chat.0;
+    let path = format!("database/{}", id);
+    debug!("Initializing database for chat ID {} ...", id);
+    let db = sled::open(path).unwrap();
     return db;
 }
 
@@ -29,14 +30,14 @@ pub fn intodb(chatid: ChatId, msgid: MessageId, db: &Db) -> Result<(), Error> {
             let mut message_ids: Vec<i32> = Vec::new();
             message_ids.push(mid);
             let serialized = serialize(message_ids);
-            db.insert(chat, &serialized[..]);
+            db.insert(chat, &serialized[..])?;
         }
         Some(entries) => {
             let decoded = bts(&entries).unwrap();
             let mut message_ids: Vec<i32> = deserialize(decoded);
             message_ids.push(mid);
             let serialized = serialize(message_ids);
-            db.insert(chat, &serialized[..]);
+            db.insert(chat, &serialized[..])?;
         }
     }
     Ok(())
@@ -44,11 +45,10 @@ pub fn intodb(chatid: ChatId, msgid: MessageId, db: &Db) -> Result<(), Error> {
 
 pub fn get_trash_message_ids(chatid: ChatId, db: &Db) -> Result<Vec<MessageId>, Error> {
     let chat: String = chatid.0.to_string();
-    let mut message_ids = Vec::new();
     let raw_iv_data = &db.get(&chat)?.unwrap();
     let raw_data = bts(raw_iv_data).unwrap();
     let deserialized_raw_data = deserialize(raw_data);
-    message_ids = deserialized_raw_data
+    let message_ids = deserialized_raw_data
         .into_iter()
         .map(|id| MessageId(id))
         .collect();

@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use glob::glob;
 use teloxide::types::InputFile;
 use crate::misc::cleanup;
-use tokio::task;
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -46,7 +45,7 @@ impl FileType {
     }
 }
 
-pub async fn mp3(link: String) -> Subject {
+pub fn mp3(link: String) -> Subject {
     let mp3args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new("--restrict-filenames"),
@@ -57,15 +56,11 @@ pub async fn mp3(link: String) -> Subject {
         Arg::new_with_arg("--audio-format", "mp3"),
         Arg::new_with_arg("--audio-quality", "0"),
     ];
-
-    let downloaded = task::spawn_blocking(move || {
-        dl(link, mp3args)
-    }).await.unwrap();
-
+    let downloaded = dl(link, mp3args);
     return downloaded;
 }
 
-pub async fn mp4(link: String) -> Subject {
+pub fn mp4(link: String) -> Subject {
     let mp4args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new("--restrict-filenames"),
@@ -74,11 +69,7 @@ pub async fn mp4(link: String) -> Subject {
         Arg::new("--no-embed-metadata"),
         Arg::new_with_arg("--format", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"),
     ];
-
-    let downloaded = task::spawn_blocking(move || {
-        dl(link, mp4args)
-    }).await.unwrap();
-
+    let downloaded = dl(link, mp4args);
     return downloaded;
 }
 
@@ -110,13 +101,17 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
                             paths.push(file_path);
                         }
                         else {
-                            warn!("File {} size is larger than 50 MB. Won't send.", file_path.to_str().unwrap());
+                            warn!("File {} size is larger than 50 MB, won't send", file_path.to_str().unwrap());
                         }
                     }
                     _ => {}
                 }
             }
-            trace!("{} {}(s) to send.", paths.len(), filetype.as_str());
+            let file_amount = paths.len();
+            trace!("{} {}(s) to send", file_amount, filetype.as_str());
+            if file_amount == 0 {
+                cleanup(vec![PathBuf::from(destination)]);
+            }
             let tg_files = paths
                 .iter()
                 .map(|file| InputFile::file(&file))
