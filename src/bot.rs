@@ -79,8 +79,6 @@ async fn dispatcher(bot: Bot) {
 }
 
 async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let db = &database::init();
-
     let command_handler = teloxide::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
         .branch(case![Command::Help].endpoint(help))
@@ -160,7 +158,6 @@ fn link_is_valid(link: &str) -> bool {
 
 async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseResult<()> {
     let ids = database::get_trash_message_ids(chatid, db).unwrap();
-    dbg!(&ids);
     for id in ids.into_iter() {
         trace!("Deleting Message ID {} from Chat {} ...", id.0, chatid.0);
         bot.delete_message(chatid, id).await?;
@@ -175,8 +172,8 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         info!("User @{} asked for /{}", getuser(&message), filetype.as_str());
         let mut files = Subject::default();
         match &filetype {
-            FileType::Mp3 => { files = pirate::mp3(&link[..]).await; }
-            FileType::Mp4 => { files = pirate::mp4(&link[..]).await; }
+            FileType::Mp3 => { files = pirate::mp3(link).await; }
+            FileType::Mp4 => { files = pirate::mp4(link).await; }
             _ => {}
         }
 
@@ -195,7 +192,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
             purge_trash_messages(msg.chat.id, db, &bot).await?;
             cleanup(files.paths);
         } else {
-            let error_msg = bot.send_message(msg.chat.id, "Error. Can't download.").await?;
+            let error_msg = bot.send_message(msg.chat.id, "Error. Can't download or send file(s). Link is private or the file is too large.").await?;
             database::intodb(msg.chat.id, msg.id, db);
             database::intodb(msg.chat.id, message.id, db);
             database::intodb(msg.chat.id, error_msg.id, db);
