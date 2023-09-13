@@ -26,3 +26,25 @@ pub fn cleanup(paths: Vec<PathBuf>) {
         }
     );
 }
+
+pub fn boot() {
+    use crate::logger;
+    logger::init();
+
+    ctrlc::set_handler(move || {
+        r();
+        info!("Stopping ...");
+        std::process::exit(0);
+    });
+
+    debug!("Checking dependencies ...");
+    match std::process::Command::new("yt-dlp").arg("--version").output() {
+        Err(e) => {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                error!("yt-dlp is not found. Please install yt-dlp first.");
+                std::process::exit(1);
+            }
+        }
+        _ => {}
+    }
+}

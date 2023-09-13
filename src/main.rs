@@ -9,6 +9,6 @@ mod database;
 
 #[tokio::main]
 async fn main() {
-    logger::init();
+    misc::boot();
     bot::run().await;
 }

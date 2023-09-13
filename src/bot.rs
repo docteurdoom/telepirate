@@ -31,12 +31,6 @@ enum Command {
 }
 
 async fn init() -> Result<Bot, Box<dyn Error>> {
-    ctrlc::set_handler(move || {
-        misc::r();
-        info!("Stopping ...");
-        std::process::exit(0);
-    })?;
-
     debug!("Building ngrok tunnel ...");
     let listener = ngrok::Session::builder()
        .authtoken_from_env()
