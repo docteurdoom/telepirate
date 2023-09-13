@@ -11,9 +11,9 @@ use std::error::Error;
 use teloxide::types::ChatKind;
 use sled::Db;
 use crate::misc::cleanup;
-use crate::pirate::{FileType, Subject};
+use crate::pirate::{FileType, Subject, SubjectResult};
 
-type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "These commands are supported:")]
@@ -176,48 +176,51 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         let message = bot.send_message(msg.chat.id, "Please wait ...").await?;
         let username = getuser(&message);
         info!("User @{} asked for /{}", &username, filetype.as_str());
-        let mut files = Subject::default();
-        match &filetype {
+        let subject_result = match &filetype {
             FileType::Mp3 => {
-                files = task::spawn_blocking(move || {
+                task::spawn_blocking(move || {
                     pirate::mp3(link)
-                }).await.unwrap();
+                }).await.unwrap()
             }
             FileType::Mp4 => {
-                files = task::spawn_blocking(move || {
+                task::spawn_blocking(move || {
                     pirate::mp4(link)
-                }).await.unwrap();
+                }).await.unwrap()
             }
-            _ => {}
-        }
+        };
 
-        if files.botfiles.len() != 0 {
-            for file in files.botfiles.into_iter() {
-                trace!("Sending the {} to @{} ...", filetype.as_str(), &username);
-                match &filetype {
-                    FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
-                    FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
-                    _ => {}
+        match subject_result {
+            Ok(files) => {
+                if files.botfiles.len() != 0 {
+                    for file in files.botfiles.into_iter() {
+                        trace!("Sending the {} to @{} ...", filetype.as_str(), &username);
+                        match &filetype {
+                            FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
+                            FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
+                        }
+                    }
+                    info!("Files have been delivered to @{}", &username);
+                    database::intodb(msg.chat.id, msg.id, db);
+                    database::intodb(msg.chat.id, message.id, db);
+                    purge_trash_messages(msg.chat.id, db, &bot).await?;
+                    cleanup(files.paths);
                 }
             }
-            info!("Files have been delivered to @{}", &username);
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
-            purge_trash_messages(msg.chat.id, db, &bot).await?;
-            cleanup(files.paths);
-        } else {
-            let error_msg = bot.send_message(msg.chat.id, "Error. Can't download or send file(s). Link is private or the file is too large.").await?;
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
-            database::intodb(msg.chat.id, error_msg.id, db);
+            Err(e) => {
+                let error_msg = bot.send_message(msg.chat.id, "Error. Can't download or send file(s). Link is private or the file is too large.").await?;
+                database::intodb(msg.chat.id, msg.id, db);
+                database::intodb(msg.chat.id, message.id, db);
+                database::intodb(msg.chat.id, error_msg.id, db);
+            }
         }
-    } else {
+    }
+    else {
         let ftype = filetype.as_str();
         let correct_usage = format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype);
         let message = bot.send_message(msg.chat.id, &correct_usage).await?;
         database::intodb(msg.chat.id, msg.id, db);
         database::intodb(msg.chat.id, message.id, db);
-        debug!("Reminded user @{} of a correct /{} usage", getuser(&message), ftype);
+        debug!("Reminded user @{} of a correct /{} usage", getuser( & message), ftype);
     }
     Ok(())
 }

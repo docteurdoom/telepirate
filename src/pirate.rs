@@ -13,11 +13,12 @@ pub struct Subject {
 
 #[derive(Default, Debug, Clone)]
 pub enum FileType {
+    #[default]
     Mp3,
     Mp4,
-    #[default]
-    Unknown,
 }
+
+pub type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
 
 impl FileType {
     fn determine(args: &Vec<Arg>) -> Self {
@@ -27,7 +28,7 @@ impl FileType {
             FileType::Mp4
         } else {
             error!("Unknown FileType!");
-            FileType::Unknown
+            std::process::exit(10);
         }
     }
     pub fn as_str<'a>(&self) -> &'a str {
@@ -38,14 +39,11 @@ impl FileType {
             FileType::Mp4 => {
                 "mp4"
             }
-            FileType::Unknown => {
-                ""
-            }
         }
     }
 }
 
-pub fn mp3(link: String) -> Subject {
+pub fn mp3(link: String) -> SubjectResult {
     let mp3args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new("--restrict-filenames"),
@@ -60,7 +58,7 @@ pub fn mp3(link: String) -> Subject {
     return downloaded;
 }
 
-pub fn mp4(link: String) -> Subject {
+pub fn mp4(link: String) -> SubjectResult {
     let mp4args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new("--restrict-filenames"),
@@ -73,7 +71,8 @@ pub fn mp4(link: String) -> Subject {
     return downloaded;
 }
 
-fn dl(link: String, args: Vec<Arg>) -> Subject {
+use std::error::Error;
+fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
     let filetype = FileType::determine(&args);
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
     let basename: &str = link
@@ -89,44 +88,34 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
     let path = PathBuf::from(destination);
     let ytd = YoutubeDL::new(&path, args, &link).unwrap();
 
-    let download_result = ytd.download();
-    return match download_result {
-        Ok(_) => {
-            let mut paths: Vec<PathBuf> = Vec::new();
-            for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..]).unwrap() {
-                match entry {
-                    Ok(file_path) => {
-                        // Telegram allows bots sending only files under 50 MB.
-                        if file_path.metadata().unwrap().len() < 50_000_000 {
-                            paths.push(file_path);
-                        }
-                        else {
-                            warn!("File {} size is larger than 50 MB, won't send", file_path.to_str().unwrap());
-                        }
-                    }
-                    _ => {}
+    let download_result = ytd.download()?;
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..])? {
+        match entry {
+            Ok(file_path) => {
+                // Telegram allows bots sending only files under 50 MB.
+                if file_path.metadata().unwrap().len() < 50_000_000 {
+                    paths.push(file_path);
+                } else {
+                    warn!("File {} size is larger than 50 MB, won't send", file_path.to_str().unwrap());
                 }
             }
-            let file_amount = paths.len();
-            trace!("{} {}(s) to send", file_amount, filetype.as_str());
-            if file_amount == 0 {
-                cleanup(vec![PathBuf::from(destination)]);
-            }
-            let tg_files = paths
-                .iter()
-                .map(|file| InputFile::file(&file))
-                .collect();
-            let subject = Subject {
-                filetype,
-                botfiles: tg_files,
-                paths,
-            };
-            subject
-        }
-        Err(e) => {
-            warn!("yt-dlp error: {}", e);
-            cleanup(vec![PathBuf::from(destination)]);
-            Subject::default()
+            _ => {}
         }
     }
+    let file_amount = paths.len();
+    trace!("{} {}(s) to send", file_amount, filetype.as_str());
+    if file_amount == 0 {
+        cleanup(vec![PathBuf::from(destination)]);
+    }
+    let tg_files = paths
+        .iter()
+        .map(|file| InputFile::file(&file))
+        .collect();
+    let subject = Subject {
+        filetype,
+        botfiles: tg_files,
+        paths,
+    };
+    Ok(subject)
 }
