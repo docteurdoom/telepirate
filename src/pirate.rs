@@ -109,11 +109,14 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
                         if file_path.metadata().unwrap().len() < 50_000_000 {
                             paths.push(file_path);
                         }
+                        else {
+                            warn!("File {} size is larger than 50 MB. Won't send.", file_path.to_str().unwrap());
+                        }
                     }
                     _ => {}
                 }
             }
-            trace!("Saved {} {}(s).", paths.len(), filetype.as_str());
+            trace!("{} {}(s) to send.", paths.len(), filetype.as_str());
             let tg_files = paths
                 .iter()
                 .map(|file| InputFile::file(&file))
@@ -125,7 +128,8 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
             };
             subject
         }
-        Err(_) => {
+        Err(e) => {
+            warn!("yt-dlp error: {}", e);
             cleanup(vec![PathBuf::from(destination)]);
             Subject::default()
         }

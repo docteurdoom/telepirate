@@ -196,6 +196,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
             database::intodb(msg.chat.id, msg.id, db);
             database::intodb(msg.chat.id, message.id, db);
             database::intodb(msg.chat.id, error_msg.id, db);
+            cleanup(files.paths);
         }
     } else {
         let ftype = filetype.as_str();
