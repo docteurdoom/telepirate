@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use glob::glob;
 use teloxide::types::InputFile;
 use crate::misc::cleanup;
+use std::error::Error;
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -16,6 +17,7 @@ pub enum FileType {
     #[default]
     Mp3,
     Mp4,
+    Voice,
 }
 
 pub type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
@@ -26,7 +28,11 @@ impl FileType {
             FileType::Mp3
         } else if args.len() == 8 {
             FileType::Mp4
-        } else {
+        }
+        else if args.len() == 7 {
+            FileType::Voice
+        }
+        else {
             error!("Unknown FileType!");
             std::process::exit(10);
         }
@@ -38,6 +44,9 @@ impl FileType {
             }
             FileType::Mp4 => {
                 "mp4"
+            }
+            FileType::Voice => {
+                "ogg"
             }
         }
     }
@@ -74,7 +83,20 @@ pub fn mp4(link: String) -> Subject {
     return downloaded;
 }
 
-use std::error::Error;
+pub fn ogg(link: String) -> Subject {
+    let oggargs = vec![
+        Arg::new_with_arg("--concurrent-fragments", "100000"),
+        Arg::new("--windows-filenames"),
+        Arg::new("--no-write-info-json"),
+        Arg::new("--no-embed-metadata"),
+        Arg::new("--extract-audio"),
+        Arg::new_with_arg("--audio-format", "vorbis"),
+        Arg::new_with_arg("--audio-quality", "5"),
+    ];
+    let downloaded = dl(link, oggargs);
+    return downloaded;
+}
+
 
 fn dl(link: String, args: Vec<Arg>) -> Subject {
     let filetype = FileType::determine(&args);
@@ -97,12 +119,18 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
     }
     
     let mut paths: Vec<PathBuf> = Vec::new();
-    for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..]).unwrap() {
+    let fileformat = filetype.as_str();
+    for entry in glob(&format!("{}/*{}", destination, fileformat)).unwrap() {
         match entry {
             Ok(file_path) => {
                 // Telegram allows bots sending only files under 50 MB.
-                if file_path.metadata().unwrap().len() < 50_000_000 {
-                    paths.push(file_path);
+                let filesize = file_path.metadata().unwrap().len();
+                if filesize < 50_000_000 {
+                    // Voice .ogg files are allowed only below 1 MB.
+                    if fileformat == "ogg" && filesize > 1_000_000 {}
+                    else {
+                        paths.push(file_path);
+                    }
                 }
             }
             _ => {}

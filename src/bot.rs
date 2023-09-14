@@ -22,10 +22,12 @@ enum Command {
     Start,
     #[command(description = "display this help.")]
     Help,
-    #[command(description = "download audio.")]
+    #[command(description = "get audio. Max size 50 MB.")]
     Mp3(String),
-    #[command(description = "download video.")]
+    #[command(description = "get video. Max size 50 MB.")]
     Mp4(String),
+    #[command(description = "get voice message. Max size 1 MB.")]
+    Voice(String),
     #[command(description = "delete trash messages.")]
     C,
 }
@@ -76,6 +78,7 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
         .branch(case![Command::Help].endpoint(help))
         .branch(case![Command::Mp3(link)].endpoint(mp3))
         .branch(case![Command::Mp4(link)].endpoint(mp4))
+        .branch(case![Command::Voice(link)].endpoint(voice))
         .branch(case![Command::C].endpoint(clear));
 
     let message_handler = Update::filter_message()
@@ -116,6 +119,14 @@ async fn mp4(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
     let db = database::init(chat_id);
     let filetype = FileType::Mp4;
+    process_request(link, filetype, bot, msg, &db).await;
+    Ok(())
+}
+
+async fn voice(link: String, bot: Bot, msg: Message) -> HandlerResult {
+    let chat_id = msg.chat.id;
+    let db = database::init(chat_id);
+    let filetype = FileType::Voice;
     process_request(link, filetype, bot, msg, &db).await;
     Ok(())
 }
@@ -181,6 +192,11 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
                     pirate::mp4(link)
                 }).await.unwrap()
             }
+            FileType::Voice => {
+                task::spawn_blocking(move || {
+                    pirate::ogg(link)
+                }).await.unwrap()
+            }
         };
 
         if files.botfiles.len() != 0 {
@@ -189,6 +205,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
                 match &filetype {
                     FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
                     FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
+                    FileType::Voice => { bot.send_voice(msg.chat.id, file).await?; }
                 }
             }
             info!("Files have been delivered to @{}", &username);

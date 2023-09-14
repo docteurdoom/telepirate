@@ -9,7 +9,7 @@ EnvironmentFile=/opt/telepirate/env
 User=root
 
 Restart=always
-TimeoutStopSec=0
+TimeoutStopSec=1
 
 ExecStart=/opt/telepirate/telepirate
 
