@@ -199,9 +199,15 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
                     purge_trash_messages(msg.chat.id, db, &bot).await?;
                     cleanup(files.paths);
                 }
+                else {
+                    let error_msg = bot.send_message(msg.chat.id, "Error. The file is too large.").await?;
+                    database::intodb(msg.chat.id, msg.id, db);
+                    database::intodb(msg.chat.id, message.id, db);
+                    database::intodb(msg.chat.id, error_msg.id, db);
+                }
             }
             Err(e) => {
-                let error_msg = bot.send_message(msg.chat.id, "Error. Can't download or send file(s). Link is private or the file is too large.").await?;
+                let error_msg = bot.send_message(msg.chat.id, "Error. The link contains a private resource. Not able to download.").await?;
                 database::intodb(msg.chat.id, msg.id, db);
                 database::intodb(msg.chat.id, message.id, db);
                 database::intodb(msg.chat.id, error_msg.id, db);
