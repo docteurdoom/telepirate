@@ -22,9 +22,9 @@ pub type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
 
 impl FileType {
     fn determine(args: &Vec<Arg>) -> Self {
-        return if args.len() == 7 {
+        return if args.len() == 10 {
             FileType::Mp3
-        } else if args.len() == 5 {
+        } else if args.len() == 8 {
             FileType::Mp4
         } else {
             error!("Unknown FileType!");
@@ -46,6 +46,9 @@ impl FileType {
 pub fn mp3(link: String) -> SubjectResult {
     let mp3args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
+        Arg::new_with_arg("--max-filesize", "50M"),
+        Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
+        Arg::new_with_arg("--output", "%(title)s"),
         Arg::new("--windows-filenames"),
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
@@ -60,6 +63,9 @@ pub fn mp3(link: String) -> SubjectResult {
 pub fn mp4(link: String) -> SubjectResult {
     let mp4args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
+        Arg::new_with_arg("--max-filesize", "50M"),
+        Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
+        Arg::new_with_arg("--output", "%(title)s"),
         Arg::new("--windows-filenames"),
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
@@ -91,12 +97,7 @@ fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
     for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..])? {
         match entry {
             Ok(file_path) => {
-                // Telegram allows bots sending only files under 50 MB.
-                if file_path.metadata().unwrap().len() < 50_000_000 {
-                    paths.push(file_path);
-                } else {
-                    warn!("File {} size is larger than 50 MB, won't send", file_path.to_str().unwrap());
-                }
+                paths.push(file_path);
             }
             _ => {}
         }
