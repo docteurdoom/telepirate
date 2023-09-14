@@ -76,6 +76,7 @@ pub fn mp4(link: String) -> SubjectResult {
 }
 
 use std::error::Error;
+
 fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
     let filetype = FileType::determine(&args);
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
@@ -91,8 +92,11 @@ fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
     let destination = &format!("./downloads/{}", basename)[..];
     let path = PathBuf::from(destination);
     let ytd = YoutubeDL::new(&path, args, &link).unwrap();
-
-    let download_result = ytd.download()?;
+    let download_result = ytd.download();
+    if let Err(e) = download_result {
+        cleanup(vec![PathBuf::from(destination)]);
+    }
+    
     let mut paths: Vec<PathBuf> = Vec::new();
     for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..])? {
         match entry {
