@@ -170,7 +170,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         let message = bot.send_message(msg.chat.id, "Please wait ...").await?;
         let username = getuser(&message);
         info!("User @{} asked for /{}", &username, filetype.as_str());
-        let subject_result = match &filetype {
+        let files = match &filetype {
             FileType::Mp3 => {
                 task::spawn_blocking(move || {
                     pirate::mp3(link)
@@ -183,35 +183,24 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
             }
         };
 
-        match subject_result {
-            Ok(files) => {
-                if files.botfiles.len() != 0 {
-                    for file in files.botfiles.into_iter() {
-                        trace!("Sending the {} to @{} ...", filetype.as_str(), &username);
-                        match &filetype {
-                            FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
-                            FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
-                        }
-                    }
-                    info!("Files have been delivered to @{}", &username);
-                    database::intodb(msg.chat.id, msg.id, db);
-                    database::intodb(msg.chat.id, message.id, db);
-                    purge_trash_messages(msg.chat.id, db, &bot).await?;
-                    cleanup(files.paths);
-                }
-                else {
-                    let error_msg = bot.send_message(msg.chat.id, "Error. The file is too large.").await?;
-                    database::intodb(msg.chat.id, msg.id, db);
-                    database::intodb(msg.chat.id, message.id, db);
-                    database::intodb(msg.chat.id, error_msg.id, db);
+        if files.botfiles.len() != 0 {
+            for file in files.botfiles.into_iter() {
+                trace!("Sending the {} to @{} ...", filetype.as_str(), &username);
+                match &filetype {
+                    FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
+                    FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
                 }
             }
-            Err(e) => {
-                let error_msg = bot.send_message(msg.chat.id, "Error. The link contains a private resource. Not able to download.").await?;
-                database::intodb(msg.chat.id, msg.id, db);
-                database::intodb(msg.chat.id, message.id, db);
-                database::intodb(msg.chat.id, error_msg.id, db);
-            }
+            info!("Files have been delivered to @{}", &username);
+            database::intodb(msg.chat.id, msg.id, db);
+            database::intodb(msg.chat.id, message.id, db);
+            purge_trash_messages(msg.chat.id, db, &bot).await?;
+            cleanup(files.paths);
+        } else {
+            let error_msg = bot.send_message(msg.chat.id, "Error. The file is too large or the link contains a private resource. Not able to download.").await?;
+            database::intodb(msg.chat.id, msg.id, db);
+            database::intodb(msg.chat.id, message.id, db);
+            database::intodb(msg.chat.id, error_msg.id, db);
         }
     }
     else {

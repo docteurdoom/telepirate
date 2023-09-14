@@ -43,7 +43,7 @@ impl FileType {
     }
 }
 
-pub fn mp3(link: String) -> SubjectResult {
+pub fn mp3(link: String) -> Subject {
     let mp3args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -59,7 +59,7 @@ pub fn mp3(link: String) -> SubjectResult {
     return downloaded;
 }
 
-pub fn mp4(link: String) -> SubjectResult {
+pub fn mp4(link: String) -> Subject {
     let mp4args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--max-filesize", "50M"),
@@ -76,7 +76,7 @@ pub fn mp4(link: String) -> SubjectResult {
 
 use std::error::Error;
 
-fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
+fn dl(link: String, args: Vec<Arg>) -> Subject {
     let filetype = FileType::determine(&args);
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
     let basename: &str = link
@@ -97,7 +97,7 @@ fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
     }
     
     let mut paths: Vec<PathBuf> = Vec::new();
-    for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..])? {
+    for entry in glob(&format!("{}/*{}", destination, filetype.as_str())[..]).unwrap() {
         match entry {
             Ok(file_path) => {
                 // Telegram allows bots sending only files under 50 MB.
@@ -122,5 +122,5 @@ fn dl(link: String, args: Vec<Arg>) -> SubjectResult {
         botfiles: tg_files,
         paths,
     };
-    Ok(subject)
+    return subject;
 }
