@@ -4,6 +4,7 @@ use glob::glob;
 use teloxide::types::InputFile;
 use crate::misc::cleanup;
 use std::error::Error;
+use regex::Regex;
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -46,7 +47,7 @@ impl FileType {
                 "mp4"
             }
             FileType::Voice => {
-                "ogg"
+                "opus"
             }
         }
     }
@@ -90,7 +91,7 @@ pub fn ogg(link: String) -> Subject {
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
         Arg::new("--extract-audio"),
-        Arg::new_with_arg("--audio-format", "vorbis"),
+        Arg::new_with_arg("--audio-format", "opus"),
         Arg::new_with_arg("--audio-quality", "5"),
     ];
     let downloaded = dl(link, oggargs);
@@ -115,22 +116,28 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
     let ytd = YoutubeDL::new(&path, args, &link).unwrap();
     let download_result = ytd.download();
     if let Err(e) = download_result {
+        warn!("Yt-dlp error: {}", e);
         cleanup(vec![PathBuf::from(destination)]);
     }
     
     let mut paths: Vec<PathBuf> = Vec::new();
+    let regex = Regex::new(r"(.*)(\.opus)").unwrap();
     let fileformat = filetype.as_str();
     for entry in glob(&format!("{}/*{}", destination, fileformat)).unwrap() {
         match entry {
-            Ok(file_path) => {
+            Ok(mut file_path) => {
                 // Telegram allows bots sending only files under 50 MB.
                 let filesize = file_path.metadata().unwrap().len();
                 if filesize < 50_000_000 {
-                    // Voice .ogg files are allowed only below 1 MB.
-                    if fileformat == "ogg" && filesize > 1_000_000 {}
-                    else {
-                        paths.push(file_path);
+                    let filename = file_path.to_str().unwrap();
+                    // Rename .opus into .ogg because Telegram requires so to display wave
+                    if let Some(captures) = regex.captures(filename) {
+                        let oldname = captures.get(0).unwrap().as_str();
+                        let newname = captures.get(1).unwrap().as_str().to_string() + ".ogg";
+                        std::fs::rename(oldname, &newname);
+                        file_path = PathBuf::from(newname);
                     }
+                    paths.push(file_path);
                 }
             }
             _ => {}

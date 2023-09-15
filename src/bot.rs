@@ -22,11 +22,11 @@ enum Command {
     Start,
     #[command(description = "display this help.")]
     Help,
-    #[command(description = "get audio. Max size 50 MB.")]
+    #[command(description = "get audio.")]
     Mp3(String),
-    #[command(description = "get video. Max size 50 MB.")]
+    #[command(description = "get video.")]
     Mp4(String),
-    #[command(description = "get voice message. Max size 1 MB.")]
+    #[command(description = "get audio as a voice message.")]
     Voice(String),
     #[command(description = "delete trash messages.")]
     C,

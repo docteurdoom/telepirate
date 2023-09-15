@@ -1729,6 +1729,7 @@ dependencies = [
  "humantime",
  "log",
  "ngrok",
+ "regex",
  "serde",
  "serde_json",
  "sled",
