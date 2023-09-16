@@ -5,6 +5,8 @@ use teloxide::types::InputFile;
 use crate::misc::cleanup;
 use std::error::Error;
 use regex::Regex;
+use humantime::format_rfc3339_seconds as timestamp;
+use std::time::SystemTime;
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -92,7 +94,7 @@ pub fn ogg(link: String) -> Subject {
         Arg::new("--no-embed-metadata"),
         Arg::new("--extract-audio"),
         Arg::new_with_arg("--audio-format", "opus"),
-        Arg::new_with_arg("--audio-quality", "5"),
+        Arg::new_with_arg("--audio-quality", "64K"),
     ];
     let downloaded = dl(link, oggargs);
     return downloaded;
@@ -133,7 +135,12 @@ fn dl(link: String, args: Vec<Arg>) -> Subject {
                     // Rename .opus into .ogg because Telegram requires so to display wave
                     if let Some(captures) = regex.captures(filename) {
                         let oldname = captures.get(0).unwrap().as_str();
-                        let newname = captures.get(1).unwrap().as_str().to_string() + ".ogg";
+                        let timestamp = timestamp(SystemTime::now())
+                            .to_string()
+                            .replace(":", "-")
+                            .replace("T", "_")
+                            .replace("Z", "");
+                        let newname = format!("audio_{}.ogg", timestamp);
                         std::fs::rename(oldname, &newname);
                         file_path = PathBuf::from(newname);
                     }

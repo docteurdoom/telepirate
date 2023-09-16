@@ -19,6 +19,7 @@ The file should contain only the 2 following lines:
 
 Run a `systemd` service:
 
+	systemctl enable telepirate
     systemctl start telepirate
 
 ### Notes
