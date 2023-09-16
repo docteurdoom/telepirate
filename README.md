@@ -1,11 +1,24 @@
 # TelePirate Telegram Bot
-### Download music and videos from anywhere via Telegram
+## Download music and videos from anywhere via Telegram
 
-Manual installation steps for Ubuntu:
+#### System requirements:
+
+OS Debian 12. 1 CPU + 4 GB RAM (Recommended to use with automated installation). However, it could run on old 32 bit hardware. Inside of Termux or Raspberry Pi. It could run pretty much anywhere.
+
+#### Automated installation for Debian:
+
+    sudo su root
+    apt install -y git
+    git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate
+    cd /opt/telepirate/scripts && ./debian-bootstrap.sh
+
+The script at some point will prompt to paste Ngrok and Telegram auth tokens to proceed.
+
+#### Manual installation steps:
 	
     sudo su root
     add-apt-repository ppa:tomtomtom/yt-dlp
-	apt install -y git cargo yt-dlp
+	apt install -y git cargo yt-dlp ffmpeg
     git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate
     cd /opt/telepirate && cargo build --release
     mv -v target/release/telepirate ${PWD}
