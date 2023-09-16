@@ -4,6 +4,7 @@
 Manual installation steps for Ubuntu:
 	
     sudo su root
+    add-apt-repository ppa:tomtomtom/yt-dlp
 	apt install -y git cargo yt-dlp
     git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate
     cd /opt/telepirate && cargo build --release

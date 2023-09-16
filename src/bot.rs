@@ -222,11 +222,14 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
     }
     else {
         let ftype = filetype.as_str();
-        let correct_usage = format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype);
+        let correct_usage = match &filetype {
+            FileType::Voice => { format!("Correct usage:\n\n/voice https://valid_audio_url") }
+            _ => { format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype) }
+        };
         let message = bot.send_message(msg.chat.id, &correct_usage).await?;
         database::intodb(msg.chat.id, msg.id, db);
         database::intodb(msg.chat.id, message.id, db);
-        debug!("Reminded user @{} of a correct /{} usage", getuser( & message), ftype);
+        debug!("Reminded user @{} of a correct /{} usage", getuser(&message), ftype);
     }
     Ok(())
 }
