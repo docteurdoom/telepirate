@@ -24,14 +24,14 @@ checks () {
 }
 
 prepare() {
+	einfo "Removing old yt-dlp repository ..."
+	add-apt-repository -r ppa:tomtomtom/yt-dlp -y || die "Removing old repository failed."
+
 	einfo "Syncing repositories ..."
 	apt update || die "Sync failed."
 
 	einfo "Updating the system ..."
 	apt upgrade -y || die "System update failed."
-
-	einfo "Removing old yt-dlp repository ..."
-	add-apt-repository -r ppa:tomtomtom/yt-dlp -y || die "Removing old repository failed."
 
 	einfo "Adding yt-dlp repository ..."
 	add-apt-repository ppa:tomtomtom/yt-dlp -y || die "Adding repository failed."
