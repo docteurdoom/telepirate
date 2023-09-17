@@ -8,15 +8,18 @@ OS Debian 12. 1 CPU + 4 GB RAM (Recommended to use with automated installation).
 #### Automated installation for Debian:
 
     sudo su root
-    apt install -y git
+    apt install -y git software-properties-common python3-launchpadlib
     git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate
-    cd /opt/telepirate/scripts && ./debian-bootstrap.sh
+    /opt/telepirate/scripts/debian-bootstrap.sh
 
-The script at some point will prompt to paste Ngrok and Telegram auth tokens to proceed.
+The script at some point will prompt to paste Ngrok and Telegram auth tokens to proceed. 
+Make sure the tokens have been entered correctly.
+
+	cat /opt/telepirate/env
 
 #### Manual installation steps:
 	
-    sudo su root
+    [ $(id -u) -ne 0 ] && sudo su root
     add-apt-repository ppa:tomtomtom/yt-dlp
 	apt install -y git cargo yt-dlp ffmpeg
     git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate

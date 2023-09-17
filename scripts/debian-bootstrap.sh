@@ -30,6 +30,9 @@ prepare() {
 	einfo "Updating the system ..."
 	apt upgrade -y || die "System update failed."
 
+	einfo "Removing old yt-dlp repository ..."
+	add-apt-repository -r ppa:tomtomtom/yt-dlp -y || die "Removing old repository failed."
+
 	einfo "Adding yt-dlp repository ..."
 	add-apt-repository ppa:tomtomtom/yt-dlp -y || die "Adding repository failed."
 
@@ -41,9 +44,6 @@ NAME="telepirate"
 WD="/opt/${NAME}"
 
 download() {
-	einfo "Creating workdir under ${WD}"
-	mkdir -p ${WD} || die "Can't create directory under ${WD}"
-
 	einfo "Downloading the source code ..."
 	rm -vrf ${WD}
 	git clone https://github.com/docteurdoom/telepirate.git ${WD} || die "Failed to git clone the source code."
