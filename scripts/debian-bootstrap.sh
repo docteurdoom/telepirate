@@ -39,6 +39,7 @@ prepare() {
 	einfo "Installing dependencies ..."
 	apt install -y git yt-dlp ffmpeg || die "Failed to install dependencies."
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh || die "Failed to install Rust."
+	source ${HOME}/.bashrc
 }
 
 NAME="telepirate"
