@@ -37,9 +37,7 @@ prepare() {
 	add-apt-repository ppa:tomtomtom/yt-dlp -y || die "Adding repository failed."
 
 	einfo "Installing dependencies ..."
-	apt install -y git yt-dlp ffmpeg || die "Failed to install dependencies."
-	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh || die "Failed to install Rust."
-	source ${HOME}/.bashrc
+	apt install -y git cargo yt-dlp ffmpeg gcc pkg-config openssl libssl-dev || die "Failed to install dependencies."
 }
 
 NAME="telepirate"
