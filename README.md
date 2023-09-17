@@ -21,7 +21,7 @@ Make sure the tokens have been entered correctly.
 	
     [ $(id -u) -ne 0 ] && sudo su root
     add-apt-repository ppa:tomtomtom/yt-dlp
-	apt install -y git cargo yt-dlp ffmpeg
+	apt install -y git cargo yt-dlp ffmpeg gcc pkg-config openssl libssl-dev
     git clone https://github.com/docteurdoom/telepirate.git /opt/telepirate
     cd /opt/telepirate && cargo build --release
     mv -v target/release/telepirate ${PWD}

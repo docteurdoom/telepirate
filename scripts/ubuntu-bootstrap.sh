@@ -27,14 +27,14 @@ prepare() {
 	einfo "Removing old yt-dlp repository ..."
 	add-apt-repository -r ppa:tomtomtom/yt-dlp -y || die "Removing old repository failed."
 
+	einfo "Adding yt-dlp repository ..."
+	add-apt-repository ppa:tomtomtom/yt-dlp -y || die "Adding repository failed."
+
 	einfo "Syncing repositories ..."
 	apt update || die "Sync failed."
 
 	einfo "Updating the system ..."
 	apt upgrade -y || die "System update failed."
-
-	einfo "Adding yt-dlp repository ..."
-	add-apt-repository ppa:tomtomtom/yt-dlp -y || die "Adding repository failed."
 
 	einfo "Installing dependencies ..."
 	apt install -y git cargo yt-dlp ffmpeg gcc pkg-config openssl libssl-dev || die "Failed to install dependencies."
