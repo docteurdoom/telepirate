@@ -95,7 +95,8 @@ pub fn gif(link: String) -> Subject {
         Arg::new("--windows-filenames"),
         Arg::new("--no-write-info-json"),
         Arg::new("--no-embed-metadata"),
-        Arg::new_with_arg("--format", "bv*[ext=mp4]/b[ext=mp4]"),
+        Arg::new_with_arg("--format-sort", "ext:mp4,codec:h264"),
+        Arg::new_with_arg("--format", "bv"),
     ];
     let filetype = FileType::Gif;
     let downloaded = dl(link, args, filetype);
