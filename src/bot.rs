@@ -28,6 +28,8 @@ enum Command {
     Mp4(String),
     #[command(description = "get audio as a voice message.")]
     Voice(String),
+    #[command(description = "get video as a animated GIF.")]
+    Gif(String),
     #[command(description = "delete trash messages.")]
     C,
 }
@@ -79,6 +81,7 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
         .branch(case![Command::Mp3(link)].endpoint(mp3))
         .branch(case![Command::Mp4(link)].endpoint(mp4))
         .branch(case![Command::Voice(link)].endpoint(voice))
+        .branch(case![Command::Gif(link)].endpoint(gif))
         .branch(case![Command::C].endpoint(clear));
 
     let message_handler = Update::filter_message()
@@ -127,6 +130,14 @@ async fn voice(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
     let db = database::init(chat_id);
     let filetype = FileType::Voice;
+    process_request(link, filetype, bot, msg, &db).await;
+    Ok(())
+}
+
+async fn gif(link: String, bot: Bot, msg: Message) -> HandlerResult {
+    let chat_id = msg.chat.id;
+    let db = database::init(chat_id);
+    let filetype = FileType::Gif;
     process_request(link, filetype, bot, msg, &db).await;
     Ok(())
 }
@@ -197,6 +208,11 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
                     pirate::ogg(link)
                 }).await.unwrap()
             }
+            FileType::Gif => {
+                task::spawn_blocking(move || {
+                    pirate::gif(link)
+                }).await.unwrap()
+            }
         };
 
         if files.botfiles.len() != 0 {
@@ -206,6 +222,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
                     FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
                     FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
                     FileType::Voice => { bot.send_voice(msg.chat.id, file).await?; }
+                    FileType::Gif => { bot.send_animation(msg.chat.id, file).await?; }
                 }
             }
             info!("Files have been delivered to @{}", &username);
@@ -224,6 +241,7 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         let ftype = filetype.as_str();
         let correct_usage = match &filetype {
             FileType::Voice => { format!("Correct usage:\n\n/voice https://valid_audio_url") }
+            FileType::Gif => { format!("Correct usage:\n\n/{} https://valid_video_url", ftype) }
             _ => { format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype) }
         };
         let message = bot.send_message(msg.chat.id, &correct_usage).await?;
