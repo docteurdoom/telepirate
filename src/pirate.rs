@@ -145,7 +145,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
                             .replace(":", "-")
                             .replace("T", "_")
                             .replace("Z", "");
-                        let newname = format!("audio_{}.ogg", timestamp);
+                        let newname = format!("{}/audio_{}.ogg", destination, timestamp);
                         std::fs::rename(oldname, &newname);
                         file_path = PathBuf::from(newname);
                     }
