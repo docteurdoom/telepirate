@@ -36,15 +36,17 @@ pub fn boot() {
         info!("Stopping ...");
         std::process::exit(0);
     });
+    checkdep("yt-dlp");
+    checkdep("ffmpeg");
+}
 
-    debug!("Checking dependencies ...");
-    match std::process::Command::new("yt-dlp").arg("--version").output() {
-        Err(e) => {
-            if let std::io::ErrorKind::NotFound = e.kind() {
-                error!("yt-dlp is not found. Please install yt-dlp first.");
+fn checkdep(dep: &str) {
+    debug!("Checking dependency {} ...", dep);
+    let result_output = std::process::Command::new(dep).arg("--help").output();
+    if let Err(e) = result_output {
+        if let std::io::ErrorKind::NotFound = e.kind() {
+                error!("{} is not found. Please install {} first.", dep, dep);
                 std::process::exit(1);
-            }
         }
-        _ => {}
     }
 }

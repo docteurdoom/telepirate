@@ -104,10 +104,11 @@ async fn help(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
     let db = database::init(chat_id);
     let message = bot.send_message(chat_id, Command::descriptions().to_string()).await?;
-        database::intodb(chat_id, msg.id, &db);
-        database::intodb(chat_id, message.id, &db);
-        info!("User @{} asked for /help", getuser(&message));
-        Ok(())
+    database::intodb(chat_id, msg.id, &db);
+    database::intodb(chat_id, message.id, &db);
+    info!("User @{} asked for /help", getuser(&message));
+    drop(db);
+    Ok(())
 }
 
 async fn mp3(link: String, bot: Bot, msg: Message) -> HandlerResult {
@@ -115,6 +116,7 @@ async fn mp3(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let db = database::init(chat_id);
     let filetype = FileType::Mp3;
     process_request(link, filetype, bot, msg, &db).await;
+    drop(db);
     Ok(())
 }
 
@@ -123,6 +125,7 @@ async fn mp4(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let db = database::init(chat_id);
     let filetype = FileType::Mp4;
     process_request(link, filetype, bot, msg, &db).await;
+    drop(db);
     Ok(())
 }
 
@@ -131,6 +134,7 @@ async fn voice(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let db = database::init(chat_id);
     let filetype = FileType::Voice;
     process_request(link, filetype, bot, msg, &db).await;
+    drop(db);
     Ok(())
 }
 
@@ -139,6 +143,7 @@ async fn gif(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let db = database::init(chat_id);
     let filetype = FileType::Gif;
     process_request(link, filetype, bot, msg, &db).await;
+    drop(db);
     Ok(())
 }
 
@@ -148,6 +153,7 @@ async fn clear(bot: Bot, msg: Message) -> HandlerResult {
     database::intodb(chat_id, msg.id, &db);
     purge_trash_messages(chat_id, &db, &bot).await?;
     info!("User @{} has /c'leaned up the chat", getuser(&msg));
+    drop(db);
     Ok(())
 }
 
@@ -179,7 +185,10 @@ async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseRes
     let ids = database::get_trash_message_ids(chatid, db).unwrap();
     for id in ids.into_iter() {
         trace!("Deleting Message ID {} from Chat {} ...", id.0, chatid.0);
-        bot.delete_message(chatid, id).await?;
+        match bot.delete_message(chatid, id).await {
+            Err(e) => { error!("Can't delete a message: {}", e); }
+            _ => {}
+        }
     }
     db.remove(chatid.to_string());
     Ok(())
