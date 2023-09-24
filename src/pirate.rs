@@ -1,12 +1,11 @@
-use ytd_rs::{YoutubeDL, Arg};
-use std::path::PathBuf;
-use glob::glob;
-use teloxide::types::InputFile;
 use crate::misc::cleanup;
-use std::error::Error;
-use regex::Regex;
+use glob::glob;
 use humantime::format_rfc3339_seconds as timestamp;
+use regex::Regex;
+use std::path::PathBuf;
 use std::time::SystemTime;
+use teloxide::types::InputFile;
+use ytd_rs::{Arg, YoutubeDL};
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -24,16 +23,14 @@ pub enum FileType {
     Gif,
 }
 
-pub type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
-
 impl FileType {
     pub fn as_str<'a>(&self) -> &'a str {
         return match self {
-            FileType::Mp3 => { "mp3" }
-            FileType::Mp4 => { "mp4" }
-            FileType::Voice => { "opus" }
-            FileType::Gif => { "gif" }
-        }
+            FileType::Mp3 => "mp3",
+            FileType::Mp4 => "mp4",
+            FileType::Voice => "opus",
+            FileType::Gif => "gif",
+        };
     }
 }
 
@@ -122,13 +119,13 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
         warn!("Yt-dlp error: {}", e);
         cleanup(vec![PathBuf::from(destination)]);
     }
-    
+
     let mut paths: Vec<PathBuf> = Vec::new();
     let regex = Regex::new(r"(.*)(\.opus)").unwrap();
     let fileformat = filetype.as_str();
     let filepaths = match filetype {
-        FileType::Gif => { glob(&format!("{}/*mp4", destination)).unwrap() }
-        _ => { glob(&format!("{}/*{}", destination, fileformat)).unwrap() }
+        FileType::Gif => glob(&format!("{}/*mp4", destination)).unwrap(),
+        _ => glob(&format!("{}/*{}", destination, fileformat)).unwrap(),
     };
     for entry in filepaths {
         match entry {
@@ -160,10 +157,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
     if file_amount == 0 {
         cleanup(vec![PathBuf::from(destination)]);
     }
-    let tg_files = paths
-        .iter()
-        .map(|file| InputFile::file(&file))
-        .collect();
+    let tg_files = paths.iter().map(|file| InputFile::file(&file)).collect();
     let subject = Subject {
         filetype,
         botfiles: tg_files,

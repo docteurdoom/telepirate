@@ -3,19 +3,19 @@
 // #[macro_use] extern crate log;
 // pub const CRATE_NAME: &str = module_path!();
 
-use fern::colors::{Color, ColoredLevelConfig};
-use std::time::SystemTime;
-use humantime::format_rfc3339_seconds as timestamp;
-use fern;
 use crate::CRATE_NAME;
+use fern;
+use fern::colors::{Color, ColoredLevelConfig};
+use humantime::format_rfc3339_seconds as timestamp;
+use std::time::SystemTime;
 
 pub fn init() {
     let colors = ColoredLevelConfig::new()
-    .info(Color::Green)
-    .debug(Color::Magenta)
-    .trace(Color::Blue)
-    .warn(Color::Yellow)
-    .error(Color::Red);
+        .info(Color::Green)
+        .debug(Color::Magenta)
+        .trace(Color::Blue)
+        .warn(Color::Yellow)
+        .error(Color::Red);
 
     fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -39,6 +39,7 @@ pub fn init() {
         .level_for(CRATE_NAME.replace("-", "_"), log::LevelFilter::Trace)
         .chain(std::io::stdout())
         .chain(fern::log_file("debug.log").unwrap())
-        .apply().unwrap();
+        .apply()
+        .unwrap();
     info!("Starting up ...");
 }

@@ -1,22 +1,20 @@
-use ngrok::prelude::*;
-use teloxide::{
-    dispatching::UpdateHandler,
-    prelude::*,
-    utils::command::BotCommands,
-    update_listeners::webhooks,
-};
+use crate::{database, misc::cleanup, pirate, pirate::FileType};
 use dptree::case;
-use crate::{pirate, misc, database};
+use ngrok::prelude::*;
+use sled::Db;
 use std::error::Error;
 use teloxide::types::ChatKind;
-use sled::Db;
-use crate::misc::cleanup;
-use crate::pirate::{FileType, Subject, SubjectResult};
+use teloxide::{
+    dispatching::UpdateHandler, prelude::*, update_listeners::webhooks, utils::command::BotCommands,
+};
 
 type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "These commands are supported:")]
+#[command(
+    rename_rule = "lowercase",
+    description = "These commands are supported:"
+)]
 enum Command {
     #[command(description = "start the bot.")]
     Start,
@@ -37,12 +35,12 @@ enum Command {
 async fn init() -> Result<Bot, Box<dyn Error>> {
     debug!("Building ngrok tunnel ...");
     let listener = ngrok::Session::builder()
-       .authtoken_from_env()
-       .connect()
-       .await?
-       .http_endpoint()
-       .listen()
-       .await?;
+        .authtoken_from_env()
+        .connect()
+        .await?
+        .http_endpoint()
+        .listen()
+        .await?;
 
     debug!("Initializing the bot ...");
     let bot = Bot::from_env();
@@ -84,8 +82,7 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
         .branch(case![Command::Gif(link)].endpoint(gif))
         .branch(case![Command::C].endpoint(clear));
 
-    let message_handler = Update::filter_message()
-        .branch(command_handler);
+    let message_handler = Update::filter_message().branch(command_handler);
 
     return message_handler;
 }
@@ -93,7 +90,9 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
 async fn start(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
     let db = database::init(chat_id);
-    let message: Message = bot.send_message(chat_id, Command::descriptions().to_string()).await?;
+    let message: Message = bot
+        .send_message(chat_id, Command::descriptions().to_string())
+        .await?;
     database::intodb(msg.chat.id, msg.id, &db);
     database::intodb(msg.chat.id, message.id, &db);
     info!("User @{} has /start'ed the bot", getuser(&message));
@@ -103,7 +102,9 @@ async fn start(bot: Bot, msg: Message) -> HandlerResult {
 async fn help(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
     let db = database::init(chat_id);
-    let message = bot.send_message(chat_id, Command::descriptions().to_string()).await?;
+    let message = bot
+        .send_message(chat_id, Command::descriptions().to_string())
+        .await?;
     database::intodb(chat_id, msg.id, &db);
     database::intodb(chat_id, message.id, &db);
     info!("User @{} asked for /help", getuser(&message));
@@ -157,16 +158,13 @@ async fn clear(bot: Bot, msg: Message) -> HandlerResult {
     Ok(())
 }
 
-
 fn getuser(msg: &Message) -> String {
     let chatkind = &msg.chat.kind;
     let mut username: String = String::new();
     match chatkind {
         ChatKind::Private(chat) => {
             match &chat.username {
-                None => {
-                    username = "noname".to_string()
-                }
+                None => username = "noname".to_string(),
                 Some(name) => {
                     username = name.clone();
                 }
@@ -186,7 +184,9 @@ async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseRes
     for id in ids.into_iter() {
         trace!("Deleting Message ID {} from Chat {} ...", id.0, chatid.0);
         match bot.delete_message(chatid, id).await {
-            Err(e) => { error!("Can't delete a message: {}", e); }
+            Err(e) => {
+                error!("Can't delete a message: {}", e);
+            }
             _ => {}
         }
     }
@@ -194,7 +194,13 @@ async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseRes
     Ok(())
 }
 
-async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Message, db: &Db) -> ResponseResult<()> {
+async fn process_request(
+    link: String,
+    filetype: FileType,
+    bot: Bot,
+    msg: Message,
+    db: &Db,
+) -> ResponseResult<()> {
     use tokio::task;
 
     if link_is_valid(&link) {
@@ -202,36 +208,36 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
         let username = getuser(&message);
         info!("User @{} asked for /{}", &username, filetype.as_str());
         let files = match &filetype {
-            FileType::Mp3 => {
-                task::spawn_blocking(move || {
-                    pirate::mp3(link)
-                }).await.unwrap()
-            }
-            FileType::Mp4 => {
-                task::spawn_blocking(move || {
-                    pirate::mp4(link)
-                }).await.unwrap()
-            }
-            FileType::Voice => {
-                task::spawn_blocking(move || {
-                    pirate::ogg(link)
-                }).await.unwrap()
-            }
-            FileType::Gif => {
-                task::spawn_blocking(move || {
-                    pirate::gif(link)
-                }).await.unwrap()
-            }
+            FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(link))
+                .await
+                .unwrap(),
+            FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(link))
+                .await
+                .unwrap(),
+            FileType::Voice => task::spawn_blocking(move || pirate::ogg(link))
+                .await
+                .unwrap(),
+            FileType::Gif => task::spawn_blocking(move || pirate::gif(link))
+                .await
+                .unwrap(),
         };
 
         if files.botfiles.len() != 0 {
             for file in files.botfiles.into_iter() {
                 trace!("Sending the {} to @{} ...", filetype.as_str(), &username);
                 match &filetype {
-                    FileType::Mp3 => { bot.send_audio(msg.chat.id, file).await?; }
-                    FileType::Mp4 => { bot.send_video(msg.chat.id, file).await?; }
-                    FileType::Voice => { bot.send_voice(msg.chat.id, file).await?; }
-                    FileType::Gif => { bot.send_animation(msg.chat.id, file).await?; }
+                    FileType::Mp3 => {
+                        bot.send_audio(msg.chat.id, file).await?;
+                    }
+                    FileType::Mp4 => {
+                        bot.send_video(msg.chat.id, file).await?;
+                    }
+                    FileType::Voice => {
+                        bot.send_voice(msg.chat.id, file).await?;
+                    }
+                    FileType::Gif => {
+                        bot.send_animation(msg.chat.id, file).await?;
+                    }
                 }
             }
             info!("Files have been delivered to @{}", &username);
@@ -245,18 +251,27 @@ async fn process_request(link: String, filetype: FileType, bot: Bot, msg: Messag
             database::intodb(msg.chat.id, message.id, db);
             database::intodb(msg.chat.id, error_msg.id, db);
         }
-    }
-    else {
+    } else {
         let ftype = filetype.as_str();
         let correct_usage = match &filetype {
-            FileType::Voice => { format!("Correct usage:\n\n/voice https://valid_audio_url") }
-            FileType::Gif => { format!("Correct usage:\n\n/{} https://valid_video_url", ftype) }
-            _ => { format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype) }
+            FileType::Voice => {
+                format!("Correct usage:\n\n/voice https://valid_audio_url")
+            }
+            FileType::Gif => {
+                format!("Correct usage:\n\n/{} https://valid_video_url", ftype)
+            }
+            _ => {
+                format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype)
+            }
         };
         let message = bot.send_message(msg.chat.id, &correct_usage).await?;
         database::intodb(msg.chat.id, msg.id, db);
         database::intodb(msg.chat.id, message.id, db);
-        debug!("Reminded user @{} of a correct /{} usage", getuser(&message), ftype);
+        debug!(
+            "Reminded user @{} of a correct /{} usage",
+            getuser(&message),
+            ftype
+        );
     }
     Ok(())
 }

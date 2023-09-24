@@ -1,13 +1,15 @@
-use terminal_size::{terminal_size};
-use crossterm::{ExecutableCommand, cursor};
-use std::io::{Write, stdout};
+use crossterm::{cursor, ExecutableCommand};
 use std::fs::remove_dir_all;
+use std::io::{stdout, Write};
 use std::path::PathBuf;
+use terminal_size::terminal_size;
 
 pub fn r() {
-    let size = terminal_size().unwrap().0.0;
+    let size = terminal_size().unwrap().0 .0;
     let mut spaces = String::new();
-    for _ in 0..size { spaces += " "; }
+    for _ in 0..size {
+        spaces += " ";
+    }
     print!("{}\r", spaces);
     stdout().execute(cursor::MoveUp(1));
     update();
@@ -19,12 +21,10 @@ pub fn update() {
 
 pub fn cleanup(paths: Vec<PathBuf>) {
     trace!("Cleaning up the working directory ...");
-    paths.into_iter().for_each(
-        |mut location| {
-            location.pop();
-            remove_dir_all(location);
-        }
-    );
+    paths.into_iter().for_each(|mut location| {
+        location.pop();
+        remove_dir_all(location);
+    });
 }
 
 pub fn boot() {
@@ -45,8 +45,8 @@ fn checkdep(dep: &str) {
     let result_output = std::process::Command::new(dep).arg("--help").output();
     if let Err(e) = result_output {
         if let std::io::ErrorKind::NotFound = e.kind() {
-                error!("{} is not found. Please install {} first.", dep, dep);
-                std::process::exit(1);
+            error!("{} is not found. Please install {} first.", dep, dep);
+            std::process::exit(1);
         }
     }
 }
