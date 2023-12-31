@@ -11,7 +11,7 @@ pub fn r() {
         spaces += " ";
     }
     print!("{}\r", spaces);
-    stdout().execute(cursor::MoveUp(1));
+    let _ = stdout().execute(cursor::MoveUp(1));
     update();
 }
 
@@ -23,7 +23,7 @@ pub fn cleanup(paths: Vec<PathBuf>) {
     trace!("Cleaning up the working directory ...");
     paths.into_iter().for_each(|mut location| {
         location.pop();
-        remove_dir_all(location);
+        let _ = remove_dir_all(location);
     });
 }
 
@@ -31,7 +31,7 @@ pub fn boot() {
     use crate::logger;
     logger::init();
 
-    ctrlc::set_handler(move || {
+    let _ = ctrlc::set_handler(move || {
         r();
         info!("Stopping ...");
         std::process::exit(0);

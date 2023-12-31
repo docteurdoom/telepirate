@@ -47,7 +47,7 @@ async fn init() -> Result<Bot, Box<dyn Error>> {
 
     debug!("Setting up the webhook ...");
     let addr = ([127, 0, 0, 1], 8443).into();
-    let url = listener.url().parse().unwrap();
+    let url = listener.url().parse()?;
     webhooks::axum(bot.clone(), webhooks::Options::new(addr, url)).await?;
     Ok(bot)
 }
@@ -89,24 +89,24 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
 
 async fn start(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let message: Message = bot
         .send_message(chat_id, Command::descriptions().to_string())
         .await?;
-    database::intodb(msg.chat.id, msg.id, &db);
-    database::intodb(msg.chat.id, message.id, &db);
+    database::intodb(msg.chat.id, msg.id, &db)?;
+    database::intodb(msg.chat.id, message.id, &db)?;
     info!("User @{} has /start'ed the bot", getuser(&message));
     Ok(())
 }
 
 async fn help(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let message = bot
         .send_message(chat_id, Command::descriptions().to_string())
         .await?;
-    database::intodb(chat_id, msg.id, &db);
-    database::intodb(chat_id, message.id, &db);
+    database::intodb(chat_id, msg.id, &db)?;
+    database::intodb(chat_id, message.id, &db)?;
     info!("User @{} asked for /help", getuser(&message));
     drop(db);
     Ok(())
@@ -114,44 +114,44 @@ async fn help(bot: Bot, msg: Message) -> HandlerResult {
 
 async fn mp3(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let filetype = FileType::Mp3;
-    process_request(link, filetype, bot, msg, &db).await;
+    process_request(link, filetype, bot, msg, &db).await?;
     drop(db);
     Ok(())
 }
 
 async fn mp4(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let filetype = FileType::Mp4;
-    process_request(link, filetype, bot, msg, &db).await;
+    process_request(link, filetype, bot, msg, &db).await?;
     drop(db);
     Ok(())
 }
 
 async fn voice(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let filetype = FileType::Voice;
-    process_request(link, filetype, bot, msg, &db).await;
+    process_request(link, filetype, bot, msg, &db).await?;
     drop(db);
     Ok(())
 }
 
 async fn gif(link: String, bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
+    let db = database::init(chat_id)?;
     let filetype = FileType::Gif;
-    process_request(link, filetype, bot, msg, &db).await;
+    process_request(link, filetype, bot, msg, &db).await?;
     drop(db);
     Ok(())
 }
 
 async fn clear(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id);
-    database::intodb(chat_id, msg.id, &db);
+    let db = database::init(chat_id)?;
+    database::intodb(chat_id, msg.id, &db)?;
     purge_trash_messages(chat_id, &db, &bot).await?;
     info!("User @{} has /c'leaned up the chat", getuser(&msg));
     drop(db);
@@ -179,8 +179,12 @@ fn link_is_valid(link: &str) -> bool {
     link.len() != 0
 }
 
-async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseResult<()> {
-    let ids = database::get_trash_message_ids(chatid, db).unwrap();
+async fn purge_trash_messages(
+    chatid: ChatId,
+    db: &Db,
+    bot: &Bot,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let ids = database::get_trash_message_ids(chatid, db)?;
     for id in ids.into_iter() {
         trace!("Deleting Message ID {} from Chat {} ...", id.0, chatid.0);
         match bot.delete_message(chatid, id).await {
@@ -190,7 +194,7 @@ async fn purge_trash_messages(chatid: ChatId, db: &Db, bot: &Bot) -> ResponseRes
             _ => {}
         }
     }
-    db.remove(chatid.to_string());
+    db.remove(chatid.to_string())?;
     Ok(())
 }
 
@@ -200,7 +204,7 @@ async fn process_request(
     bot: Bot,
     msg: Message,
     db: &Db,
-) -> ResponseResult<()> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     use tokio::task;
 
     if link_is_valid(&link) {
@@ -208,19 +212,11 @@ async fn process_request(
         let username = getuser(&message);
         info!("User @{} asked for /{}", &username, filetype.as_str());
         let files = match &filetype {
-            FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(link))
-                .await
-                .unwrap(),
-            FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(link))
-                .await
-                .unwrap(),
-            FileType::Voice => task::spawn_blocking(move || pirate::ogg(link))
-                .await
-                .unwrap(),
-            FileType::Gif => task::spawn_blocking(move || pirate::gif(link))
-                .await
-                .unwrap(),
-        };
+            FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(link)).await?,
+            FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(link)).await?,
+            FileType::Voice => task::spawn_blocking(move || pirate::ogg(link)).await?,
+            FileType::Gif => task::spawn_blocking(move || pirate::gif(link)).await?,
+        }?;
 
         if files.botfiles.len() != 0 {
             for file in files.botfiles.into_iter() {
@@ -241,15 +237,15 @@ async fn process_request(
                 }
             }
             info!("Files have been delivered to @{}", &username);
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
+            database::intodb(msg.chat.id, msg.id, db)?;
+            database::intodb(msg.chat.id, message.id, db)?;
             purge_trash_messages(msg.chat.id, db, &bot).await?;
             cleanup(files.paths);
         } else {
             let error_msg = bot.send_message(msg.chat.id, "Error. The file is too large or the link contains a private resource. Not able to download.").await?;
-            database::intodb(msg.chat.id, msg.id, db);
-            database::intodb(msg.chat.id, message.id, db);
-            database::intodb(msg.chat.id, error_msg.id, db);
+            database::intodb(msg.chat.id, msg.id, db)?;
+            database::intodb(msg.chat.id, message.id, db)?;
+            database::intodb(msg.chat.id, error_msg.id, db)?;
         }
     } else {
         let ftype = filetype.as_str();
@@ -265,8 +261,8 @@ async fn process_request(
             }
         };
         let message = bot.send_message(msg.chat.id, &correct_usage).await?;
-        database::intodb(msg.chat.id, msg.id, db);
-        database::intodb(msg.chat.id, message.id, db);
+        database::intodb(msg.chat.id, msg.id, db)?;
+        database::intodb(msg.chat.id, message.id, db)?;
         debug!(
             "Reminded user @{} of a correct /{} usage",
             getuser(&message),

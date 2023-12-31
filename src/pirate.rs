@@ -2,10 +2,13 @@ use crate::misc::cleanup;
 use glob::glob;
 use humantime::format_rfc3339_seconds as timestamp;
 use regex::Regex;
+use std::error::Error;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use teloxide::types::InputFile;
 use ytd_rs::{Arg, YoutubeDL};
+
+type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
 
 #[derive(Default, Debug, Clone)]
 pub struct Subject {
@@ -34,7 +37,7 @@ impl FileType {
     }
 }
 
-pub fn mp3(link: String) -> Subject {
+pub fn mp3(link: String) -> SubjectResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -47,11 +50,11 @@ pub fn mp3(link: String) -> Subject {
         Arg::new_with_arg("--audio-quality", "0"),
     ];
     let filetype = FileType::Mp3;
-    let downloaded = dl(link, args, filetype);
-    return downloaded;
+    let downloaded = dl(link, args, filetype)?;
+    Ok(downloaded)
 }
 
-pub fn mp4(link: String) -> Subject {
+pub fn mp4(link: String) -> SubjectResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -63,11 +66,11 @@ pub fn mp4(link: String) -> Subject {
         Arg::new_with_arg("--format", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"),
     ];
     let filetype = FileType::Mp4;
-    let downloaded = dl(link, args, filetype);
-    return downloaded;
+    let downloaded = dl(link, args, filetype)?;
+    Ok(downloaded)
 }
 
-pub fn ogg(link: String) -> Subject {
+pub fn ogg(link: String) -> SubjectResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -79,11 +82,11 @@ pub fn ogg(link: String) -> Subject {
         Arg::new_with_arg("--audio-quality", "64K"),
     ];
     let filetype = FileType::Voice;
-    let downloaded = dl(link, args, filetype);
-    return downloaded;
+    let downloaded = dl(link, args, filetype)?;
+    Ok(downloaded)
 }
 
-pub fn gif(link: String) -> Subject {
+pub fn gif(link: String) -> SubjectResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -96,11 +99,11 @@ pub fn gif(link: String) -> Subject {
         Arg::new_with_arg("--format", "bv"),
     ];
     let filetype = FileType::Gif;
-    let downloaded = dl(link, args, filetype);
-    return downloaded;
+    let downloaded = dl(link, args, filetype)?;
+    Ok(downloaded)
 }
 
-fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
+fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
     let basename: &str = link
         .split("/")
@@ -113,7 +116,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
         .unwrap();
     let destination = &format!("./downloads/{}", basename)[..];
     let path = PathBuf::from(destination);
-    let ytd = YoutubeDL::new(&path, args, &link).unwrap();
+    let ytd = YoutubeDL::new(&path, args, &link)?;
     let download_result = ytd.download();
     if let Err(ref e) = download_result {
         warn!("Yt-dlp error: {}", e);
@@ -124,14 +127,14 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
     let regex = Regex::new(r"(.*)(\.opus)").unwrap();
     let fileformat = filetype.as_str();
     let filepaths = match filetype {
-        FileType::Gif => glob(&format!("{}/*mp4", destination)).unwrap(),
-        _ => glob(&format!("{}/*{}", destination, fileformat)).unwrap(),
+        FileType::Gif => glob(&format!("{}/*mp4", destination))?,
+        _ => glob(&format!("{}/*{}", destination, fileformat))?,
     };
     for entry in filepaths {
         match entry {
             Ok(mut file_path) => {
                 // Telegram allows bots sending only files under 50 MB.
-                let filesize = file_path.metadata().unwrap().len();
+                let filesize = file_path.metadata()?.len();
                 if filesize < 50_000_000 {
                     let filename = file_path.to_str().unwrap();
                     // Rename .opus into .ogg because Telegram requires so to display wave
@@ -143,7 +146,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
                             .replace("T", "_")
                             .replace("Z", "");
                         let newname = format!("{}/audio_{}.ogg", destination, timestamp);
-                        std::fs::rename(oldname, &newname);
+                        std::fs::rename(oldname, &newname)?;
                         file_path = PathBuf::from(newname);
                     }
                     paths.push(file_path);
@@ -163,5 +166,5 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> Subject {
         botfiles: tg_files,
         paths,
     };
-    return subject;
+    Ok(subject)
 }
