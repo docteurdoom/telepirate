@@ -67,6 +67,12 @@ pub async fn run() {
 async fn dispatcher(bot: Bot) {
     Dispatcher::builder(bot, handler().await)
         .enable_ctrlc_handler()
+        .default_handler(|upd| async move {
+            warn!("Unhandled update: {:?}", upd);
+        })
+        .error_handler(LoggingErrorHandler::with_custom_text(
+            "Handler error."
+        ))
         .build()
         .dispatch()
         .await;

@@ -1735,7 +1735,7 @@ checksum = "20f34339676cdcab560c9a82300c4c2581f68b9369aedf0fae86f2ff9565ff3e"
 
 [[package]]
 name = "telepirate"
-version = "1.0.1"
+version = "1.0.9"
 dependencies = [
  "colored 2.1.0",
  "crossterm",
