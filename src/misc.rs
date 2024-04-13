@@ -20,8 +20,9 @@ pub fn update() {
 }
 
 pub fn cleanup(paths: Vec<PathBuf>) {
-    trace!("Cleaning up the working directory ...");
+    debug!("Cleaning up the working directory ...");
     paths.into_iter().for_each(|mut location| {
+        trace!("Deleting {} ...", location.display());
         location.pop();
         let _ = remove_dir_all(location);
     });
