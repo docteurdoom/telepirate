@@ -1,0 +1,47 @@
+#!/sbin/openrc-run
+
+name="Telepirate Bot"
+codename="telepirate"
+
+command="/path/to/${codename}"
+command_background="true"
+
+supervisor="supervise-daemon"
+
+export NGROK_AUTHTOKEN="your_token_here"
+export TELOXIDE_TOKEN="your_token_here"
+
+command_user="user"
+homedir="/home/user"
+basedir="${homedir}/${codename}/"
+workdir="${homedir}/${codename}-sym/"
+
+depend() {
+	need net-online
+}
+
+start() {
+	ebegin "Starting $name"
+	start-stop-daemon \
+		--start \
+		--background \
+		--stdout ${basedir}/rc-stdout.log \
+		--stderr ${basedir}/rc-stderr.log \
+		--exec "$command" \
+		--user "$command_user" \
+		--chdir "$workdir" \
+		--env "NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}" \
+		--env "TELOXIDE_TOKEN=${TELOXIDE_TOKEN}" \
+		-- $command_args
+	eend $?
+}
+
+stop() {
+	ebegin "Stopping $name"
+	start-stop-daemon \
+		--stop \
+		--exec "$command" \
+		--user "$command_user" \
+		--chdir "$workdir" --quiet --retry=TERM/1/KILL/5
+	eend $?
+}
