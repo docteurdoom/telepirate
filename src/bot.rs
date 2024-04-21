@@ -1,4 +1,4 @@
-use crate::{database, misc::cleanup, pirate, pirate::FileType};
+use crate::{database, misc::{cleanup, sleep}, pirate, pirate::FileType};
 use dptree::case;
 use ngrok::prelude::*;
 use sled::Db;
@@ -53,14 +53,18 @@ async fn init() -> Result<Bot, Box<dyn Error>> {
 }
 
 pub async fn run() {
-    match init().await {
-        Ok(bot) => {
-            info!("Connection has been established");
-            dispatcher(bot).await;
+    loop {
+        match init().await {
+            Ok(bot) => {
+                info!("Connection has been established");
+                dispatcher(bot).await;
+            }
+            Err(reason) => {
+                error!("{}", reason);
+            }
         }
-        Err(reason) => {
-            dbg!(reason);
-        }
+        warn!("Could not establish connection. Trying again after 30 seconds.");
+        sleep(30);
     }
 }
 

@@ -1,4 +1,3 @@
-//#![allow(unused_must_use)]
 #[macro_use]
 extern crate log;
 pub const CRATE_NAME: &str = module_path!();

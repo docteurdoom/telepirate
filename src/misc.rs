@@ -1,23 +1,7 @@
-use crossterm::{cursor, ExecutableCommand};
 use std::fs::remove_dir_all;
-use std::io::{stdout, Write};
 use std::path::PathBuf;
-use terminal_size::terminal_size;
-
-pub fn r() {
-    let size = terminal_size().unwrap().0 .0;
-    let mut spaces = String::new();
-    for _ in 0..size {
-        spaces += " ";
-    }
-    print!("{}\r", spaces);
-    let _ = stdout().execute(cursor::MoveUp(1));
-    update();
-}
-
-pub fn update() {
-    stdout().flush().unwrap();
-}
+use std::thread;
+use std::time;
 
 pub fn cleanup(paths: Vec<PathBuf>) {
     debug!("Cleaning up the working directory ...");
@@ -32,11 +16,6 @@ pub fn boot() {
     use crate::logger;
     logger::init();
 
-    let _ = ctrlc::set_handler(move || {
-        r();
-        info!("Stopping ...");
-        std::process::exit(0);
-    });
     checkdep("yt-dlp");
     checkdep("ffmpeg");
 }
@@ -50,4 +29,9 @@ fn checkdep(dep: &str) {
             std::process::exit(1);
         }
     }
+}
+
+pub fn sleep(secs: u32) {
+    let time = time::Duration::from_secs(secs.into());
+    thread::sleep(time);
 }
