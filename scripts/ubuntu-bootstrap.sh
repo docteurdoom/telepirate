@@ -62,7 +62,7 @@ compile() {
 
 launch() {
 	einfo "Adding systemd services ..."
-	cp -v "${WD}/systemd-services/${NAME}.service" "/etc/systemd/system"
+	cp -v "${WD}/service-files/${NAME}.service" "/etc/systemd/system"
 
 	einfo "Enabling ${NAME} to start on boot ..."
 	systemctl enable "${NAME}" || die "Failed to make service launch on boot."
