@@ -1,68 +1,35 @@
-use sled::Db;
 use std::error::Error;
-use std::str::from_utf8 as bts;
+use surrealdb::{engine::local::Db, engine::local::File, Surreal};
 use teloxide::types::{ChatId, MessageId};
+use crate::CRATE_NAME;
 
-pub fn init(chat: ChatId) -> Result<Db, Box<dyn Error + Send + Sync>> {
-    let id = chat.0;
-    let path = format!("database/{}", id);
-    debug!("Initializing database for chat ID {} ...", id);
-    let db = sled::open(path)?;
+pub async fn init(chat_id: ChatId) -> Result<Surreal<Db>, Box<dyn Error + Send + Sync>> {
+    let chat_id_string = chat_id.0.to_string();
+    info!("Initializing database for chat ID {} ...", &chat_id_string);
+    let db = Surreal::new::<File>("./surrealdb").await?;
+    db.use_ns(CRATE_NAME).use_db(CRATE_NAME).await?;
     Ok(db)
 }
 
-fn serialize(x: Vec<i32>) -> String {
-    let s = serde_json::to_string(&x).unwrap();
-    return s;
-}
-
-fn deserialize(x: impl Into<String>) -> Vec<i32> {
-    let v = serde_json::from_str(&x.into()).unwrap();
-    return v;
-}
-
-pub fn intodb(
+pub async fn intodb(
     chatid: ChatId,
     msgid: MessageId,
-    db: &Db,
+    db: &Surreal<Db>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let chat: String = chatid.0.to_string();
-    let mid = msgid.0;
     trace!(
         "Recording message ID {} from Chat {} into DB ...",
-        mid,
+        msgid.0,
         &chat
     );
-    let values = db.get(&chat)?;
-    match values {
-        None => {
-            let mut message_ids: Vec<i32> = Vec::new();
-            message_ids.push(mid);
-            let serialized = serialize(message_ids);
-            db.insert(chat, &serialized[..])?;
-        }
-        Some(entries) => {
-            let decoded = bts(&entries)?;
-            let mut message_ids: Vec<i32> = deserialize(decoded);
-            message_ids.push(mid);
-            let serialized = serialize(message_ids);
-            db.insert(chat, &serialized[..])?;
-        }
-    }
+    let _: Vec<MessageId> = db.create(chat).content(msgid).await?;
     Ok(())
 }
 
-pub fn get_trash_message_ids(
+pub async fn get_trash_message_ids(
     chatid: ChatId,
-    db: &Db,
+    db: &Surreal<Db>,
 ) -> Result<Vec<MessageId>, Box<dyn Error + Send + Sync>> {
-    let chat: String = chatid.0.to_string();
-    let raw_iv_data = &db.get(&chat)?.unwrap();
-    let raw_data = bts(raw_iv_data)?;
-    let deserialized_raw_data = deserialize(raw_data);
-    let message_ids = deserialized_raw_data
-        .into_iter()
-        .map(|id| MessageId(id))
-        .collect();
+    let message_ids: Vec<MessageId> = db.select(chatid.0.to_string()).await?;
     Ok(message_ids)
 }

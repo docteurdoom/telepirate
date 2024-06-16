@@ -15,13 +15,12 @@ pub fn cleanup(paths: Vec<PathBuf>) {
 pub fn boot() {
     use crate::logger;
     logger::init();
-
     checkdep("yt-dlp");
     checkdep("ffmpeg");
 }
 
 fn checkdep(dep: &str) {
-    debug!("Checking dependency {} ...", dep);
+    trace!("Checking dependency {} ...", dep);
     let result_output = std::process::Command::new(dep).arg("--help").output();
     if let Err(e) = result_output {
         if let std::io::ErrorKind::NotFound = e.kind() {

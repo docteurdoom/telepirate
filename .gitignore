@@ -5,3 +5,5 @@
 /src/debug.log
 /.idea
 /.vscode
+/surrealdb
+/src/surrealdb
