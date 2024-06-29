@@ -1,15 +1,14 @@
 use crate::{
-    database,
+    database::{self, delete_trash_from_chat},
     misc::{cleanup, sleep},
-    pirate,
-    pirate::FileType,
+    pirate::{self, FileType},
 };
 use dptree::case;
 use ngrok::prelude::*;
 use std::error::Error;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
-use teloxide::types::{ChatKind, MessageId};
+use teloxide::types::ChatKind;
 use teloxide::{
     dispatching::UpdateHandler, prelude::*, update_listeners::webhooks, utils::command::BotCommands,
 };
@@ -38,7 +37,7 @@ enum Command {
     C,
 }
 
-async fn init() -> Result<Bot, Box<dyn Error>> {
+async fn bot_init() -> Result<Bot, Box<dyn Error>> {
     debug!("Building ngrok tunnel ...");
     let listener = ngrok::Session::builder()
         .authtoken_from_env()
@@ -60,10 +59,11 @@ async fn init() -> Result<Bot, Box<dyn Error>> {
 
 pub async fn run() {
     loop {
-        match init().await {
+        match bot_init().await {
             Ok(bot) => {
-                info!("Connection has been established");
-                dispatcher(bot).await;
+                info!("Connection has been established.");
+                let db = database::initialize().await;
+                dispatcher(bot, db).await;
             }
             Err(reason) => {
                 error!("{}", reason);
@@ -74,9 +74,10 @@ pub async fn run() {
     }
 }
 
-async fn dispatcher(bot: Bot) {
+async fn dispatcher(bot: Bot, db: Surreal<Db>) {
     Dispatcher::builder(bot, handler().await)
         .enable_ctrlc_handler()
+        .dependencies(dptree::deps![db])
         .default_handler(|upd| async move {
             warn!("Unhandled update: {:?}", upd);
         })
@@ -101,74 +102,57 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
     return message_handler;
 }
 
-async fn start(bot: Bot, msg: Message) -> HandlerResult {
+async fn start(bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
     let message: Message = bot
         .send_message(chat_id, Command::descriptions().to_string())
         .await?;
     database::intodb(msg.chat.id, msg.id, &db).await?;
     database::intodb(msg.chat.id, message.id, &db).await?;
-    info!("User @{} has /start'ed the bot", getuser(&message));
+    info!("User @{} has /start'ed the bot.", getuser(&message));
     Ok(())
 }
 
-async fn help(bot: Bot, msg: Message) -> HandlerResult {
+async fn help(bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
     let message = bot
         .send_message(chat_id, Command::descriptions().to_string())
         .await?;
     database::intodb(msg.chat.id, msg.id, &db).await?;
     database::intodb(msg.chat.id, message.id, &db).await?;
-    info!("User @{} asked for /help", getuser(&message));
-    db.invalidate().await?;
+    info!("User @{} asked for /help.", getuser(&message));
     Ok(())
 }
 
-async fn mp3(link: String, bot: Bot, msg: Message) -> HandlerResult {
-    let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
+async fn mp3(link: String, bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Mp3;
     process_request(link, filetype, bot, msg, &db).await?;
-    db.invalidate().await?;
     Ok(())
 }
 
-async fn mp4(link: String, bot: Bot, msg: Message) -> HandlerResult {
-    let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
+async fn mp4(link: String, bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Mp4;
     process_request(link, filetype, bot, msg, &db).await?;
-    db.invalidate().await?;
     Ok(())
 }
 
-async fn voice(link: String, bot: Bot, msg: Message) -> HandlerResult {
-    let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
+async fn voice(link: String, bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Voice;
     process_request(link, filetype, bot, msg, &db).await?;
-    db.invalidate().await?;
     Ok(())
 }
 
-async fn gif(link: String, bot: Bot, msg: Message) -> HandlerResult {
-    let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
+async fn gif(link: String, bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Gif;
     process_request(link, filetype, bot, msg, &db).await?;
-    db.invalidate().await?;
     Ok(())
 }
 
-async fn clear(bot: Bot, msg: Message) -> HandlerResult {
+async fn clear(bot: Bot, msg: Message, db: Surreal<Db>) -> HandlerResult {
     let chat_id = msg.chat.id;
-    let db = database::init(chat_id).await?;
     database::intodb(msg.chat.id, msg.id, &db).await?;
     purge_trash_messages(chat_id, &db, &bot).await?;
     info!("User @{} has /c'leaned up the chat", getuser(&msg));
-    db.invalidate().await?;
     Ok(())
 }
 
@@ -208,7 +192,7 @@ async fn purge_trash_messages(
             _ => {}
         }
     }
-    let _: Vec<MessageId> = db.delete(chatid.to_string()).await?;
+    delete_trash_from_chat(chatid, db).await?;
     Ok(())
 }
 
@@ -224,7 +208,7 @@ async fn process_request(
     if link_is_valid(&link) {
         let message = bot.send_message(msg.chat.id, "Please wait ...").await?;
         let username = getuser(&message);
-        info!("User @{} asked for /{}", &username, filetype.as_str());
+        info!("User @{} asked for /{}.", &username, filetype.as_str());
         database::intodb(msg.chat.id, msg.id, &db).await?;
         database::intodb(msg.chat.id, message.id, &db).await?;
         let files = match &filetype {
@@ -252,7 +236,7 @@ async fn process_request(
                     }
                 }
             }
-            info!("Files have been delivered to @{}", &username);
+            info!("Files have been delivered to @{}.", &username);
             purge_trash_messages(msg.chat.id, db, &bot).await?;
             cleanup(files.paths);
         } else {
@@ -278,7 +262,7 @@ async fn process_request(
         database::intodb(msg.chat.id, msg.id, &db).await?;
         database::intodb(msg.chat.id, message.id, &db).await?;
         debug!(
-            "Reminded user @{} of a correct /{} usage",
+            "Reminded user @{} of a correct /{} usage.",
             getuser(&message),
             ftype
         );

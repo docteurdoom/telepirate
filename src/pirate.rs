@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 use teloxide::types::InputFile;
 use ytd_rs::{Arg, YoutubeDL};
+use uuid::Uuid;
 
 type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
 
@@ -105,16 +106,8 @@ pub fn gif(link: String) -> SubjectResult {
 
 fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
-    let basename: &str = link
-        .split("/")
-        .collect::<Vec<&str>>()
-        .last()
-        .unwrap()
-        .split("?v=")
-        .collect::<Vec<&str>>()
-        .last()
-        .unwrap();
-    let destination = &format!("./downloads/{}", basename)[..];
+    let destination_folder_name = Uuid::new_v4();
+    let destination = &format!("./downloads/{}", destination_folder_name)[..];
     let path = PathBuf::from(destination);
     let ytd = YoutubeDL::new(&path, args, &link)?;
     let download_result = ytd.download();
