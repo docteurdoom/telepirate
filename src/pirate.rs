@@ -9,10 +9,10 @@ use teloxide::types::InputFile;
 use ytd_rs::{Arg, YoutubeDL};
 use uuid::Uuid;
 
-type SubjectResult = Result<Subject, Box<dyn Error + Send + Sync>>;
+type DownloadsResult = Result<Downloads, Box<dyn Error + Send + Sync>>;
 
 #[derive(Default, Debug, Clone)]
-pub struct Subject {
+pub struct Downloads {
     pub filetype: FileType,
     pub botfiles: Vec<InputFile>,
     pub paths: Vec<PathBuf>,
@@ -38,7 +38,7 @@ impl FileType {
     }
 }
 
-pub fn mp3(link: String) -> SubjectResult {
+pub fn mp3(link: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -55,7 +55,7 @@ pub fn mp3(link: String) -> SubjectResult {
     Ok(downloaded)
 }
 
-pub fn mp4(link: String) -> SubjectResult {
+pub fn mp4(link: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -71,7 +71,7 @@ pub fn mp4(link: String) -> SubjectResult {
     Ok(downloaded)
 }
 
-pub fn ogg(link: String) -> SubjectResult {
+pub fn ogg(link: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -87,7 +87,7 @@ pub fn ogg(link: String) -> SubjectResult {
     Ok(downloaded)
 }
 
-pub fn gif(link: String) -> SubjectResult {
+pub fn gif(link: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -104,24 +104,20 @@ pub fn gif(link: String) -> SubjectResult {
     Ok(downloaded)
 }
 
-fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
+fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
-    let destination_folder_name = Uuid::new_v4();
-    let destination = &format!("./downloads/{}", destination_folder_name)[..];
-    let path = PathBuf::from(destination);
+    // UUID is used because thats my choice.
+    let destination_basename = Uuid::new_v4();
+    let relative_destination_path = &format!("./downloads/{}", destination_basename)[..];
+    let path = PathBuf::from(relative_destination_path);
     let ytd = YoutubeDL::new(&path, args, &link)?;
-    let download_result = ytd.download();
-    if let Err(ref e) = download_result {
-        warn!("Yt-dlp error: {}", e);
-        cleanup(vec![PathBuf::from(destination)]);
-    }
-
+    let _ = ytd.download()?;
     let mut paths: Vec<PathBuf> = Vec::new();
     let regex = Regex::new(r"(.*)(\.opus)").unwrap();
     let fileformat = filetype.as_str();
     let filepaths = match filetype {
-        FileType::Gif => glob(&format!("{}/*mp4", destination))?,
-        _ => glob(&format!("{}/*{}", destination, fileformat))?,
+        FileType::Gif => glob(&format!("{}/*mp4", relative_destination_path))?,
+        _ => glob(&format!("{}/*{}", relative_destination_path, fileformat))?,
     };
     for entry in filepaths {
         match entry {
@@ -130,7 +126,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
                 let filesize = file_path.metadata()?.len();
                 if filesize < 50_000_000 {
                     let filename = file_path.to_str().unwrap();
-                    // Rename .opus into .ogg because Telegram requires so to display wave
+                    // Rename .opus into .ogg because Telegram requires so to display wave pattern.
                     if let Some(captures) = regex.captures(filename) {
                         let oldname = captures.get(0).unwrap().as_str();
                         let timestamp = timestamp(SystemTime::now())
@@ -138,7 +134,7 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
                             .replace(":", "-")
                             .replace("T", "_")
                             .replace("Z", "");
-                        let newname = format!("{}/audio_{}.ogg", destination, timestamp);
+                        let newname = format!("{}/audio_{}.ogg", relative_destination_path, timestamp);
                         std::fs::rename(oldname, &newname)?;
                         file_path = PathBuf::from(newname);
                     }
@@ -151,10 +147,10 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> SubjectResult {
     let file_amount = paths.len();
     trace!("{} {}(s) to send", file_amount, filetype.as_str());
     if file_amount == 0 {
-        cleanup(vec![PathBuf::from(destination)]);
+        cleanup(vec![PathBuf::from(relative_destination_path)]);
     }
     let tg_files = paths.iter().map(|file| InputFile::file(&file)).collect();
-    let subject = Subject {
+    let subject = Downloads {
         filetype,
         botfiles: tg_files,
         paths,

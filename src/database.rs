@@ -19,33 +19,33 @@ pub async fn initialize() -> Surreal<Db> {
 }
 
 pub async fn intodb(
-    chatid: ChatId,
-    msgid: MessageId,
+    chat_id: ChatId,
+    msg_id: MessageId,
     db: &Surreal<Db>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let chat: String = chatid.0.to_string();
+    let chat: String = chat_id.0.to_string();
     trace!(
         "Recording message ID {} from Chat {} into DB ...",
-        msgid.0,
+        msg_id.0,
         &chat
     );
-    let _: Vec<MessageId> = db.create(chat).content(msgid).await?;
+    let _: Vec<MessageId> = db.create(chat).content(msg_id).await?;
     Ok(())
 }
 
 pub async fn get_trash_message_ids(
-    chatid: ChatId,
+    chat_id: ChatId,
     db: &Surreal<Db>,
 ) -> Result<Vec<MessageId>, Box<dyn Error + Send + Sync>> {
-    let message_ids: Vec<MessageId> = db.select(chatid.0.to_string()).await?;
+    let message_ids: Vec<MessageId> = db.select(chat_id.0.to_string()).await?;
     Ok(message_ids)
 }
 
 pub async fn delete_trash_from_chat(
-    chatid: ChatId,
+    chat_id: ChatId,
     db: &Surreal<Db>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    trace!("Cleaning up the database for chat ID {} ...", chatid.0);
-    let _: Vec<MessageId> = db.delete(chatid.to_string()).await?;
+    trace!("Cleaning up the database for chat ID {} ...", chat_id.0);
+    let _: Vec<MessageId> = db.delete(chat_id.to_string()).await?;
     Ok(())
 }
