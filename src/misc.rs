@@ -2,14 +2,19 @@ use std::fs::remove_dir_all;
 use std::path::PathBuf;
 use std::thread;
 use std::time;
+use validators::prelude::*;
+use validators::url::Url;
 
-pub fn cleanup(paths: Vec<PathBuf>) {
-    debug!("Cleaning up the working directory ...");
-    paths.into_iter().for_each(|mut location| {
-        trace!("Deleting {} ...", location.display());
-        location.pop();
-        let _ = remove_dir_all(location);
-    });
+#[derive(Validator)]
+#[validator(http_url(local(Allow)))]
+pub struct HttpURL {
+    url: Url,
+    is_https: bool,
+}
+
+pub fn cleanup(relative_destination_path: PathBuf) {
+    debug!("Deleting the working directory ...");
+    remove_dir_all(relative_destination_path).unwrap();
 }
 
 pub fn boot() {
@@ -33,4 +38,8 @@ fn checkdep(dep: &str) {
 pub fn sleep(secs: u32) {
     let time = time::Duration::from_secs(secs.into());
     thread::sleep(time);
+}
+
+pub fn url_is_valid(url: &str) -> bool {
+    return HttpURL::parse_string(url).is_ok();
 }

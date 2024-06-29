@@ -31,4 +31,5 @@ teloxide = { version = "0.12.2", features = ["webhooks-axum", "macros"] }
 terminal_size = "0.2.6"
 tokio = { version = "1.29.0", features = ["rt-multi-thread", "macros"] }
 uuid = { version = "1.9.1", default-features = false, features = ["v4"] }
+validators = { version = "0.25.3", features = ["url", "derive", "http_url"], default-features = false }
 ytd-rs = { version = "0.1.7", features = ["yt-dlp"] }

@@ -16,6 +16,7 @@ pub struct Downloads {
     pub filetype: FileType,
     pub botfiles: Vec<InputFile>,
     pub paths: Vec<PathBuf>,
+    pub folder: PathBuf,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -38,7 +39,7 @@ impl FileType {
     }
 }
 
-pub fn mp3(link: String) -> DownloadsResult {
+pub fn mp3(url: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -51,11 +52,11 @@ pub fn mp3(link: String) -> DownloadsResult {
         Arg::new_with_arg("--audio-quality", "0"),
     ];
     let filetype = FileType::Mp3;
-    let downloaded = dl(link, args, filetype)?;
+    let downloaded = dl(url, args, filetype)?;
     Ok(downloaded)
 }
 
-pub fn mp4(link: String) -> DownloadsResult {
+pub fn mp4(url: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -67,11 +68,11 @@ pub fn mp4(link: String) -> DownloadsResult {
         Arg::new_with_arg("--format", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"),
     ];
     let filetype = FileType::Mp4;
-    let downloaded = dl(link, args, filetype)?;
+    let downloaded = dl(url, args, filetype)?;
     Ok(downloaded)
 }
 
-pub fn ogg(link: String) -> DownloadsResult {
+pub fn ogg(url: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -83,11 +84,11 @@ pub fn ogg(link: String) -> DownloadsResult {
         Arg::new_with_arg("--audio-quality", "64K"),
     ];
     let filetype = FileType::Voice;
-    let downloaded = dl(link, args, filetype)?;
+    let downloaded = dl(url, args, filetype)?;
     Ok(downloaded)
 }
 
-pub fn gif(link: String) -> DownloadsResult {
+pub fn gif(url: String) -> DownloadsResult {
     let args = vec![
         Arg::new_with_arg("--concurrent-fragments", "100000"),
         Arg::new_with_arg("--skip-playlist-after-errors", "5000"),
@@ -100,17 +101,17 @@ pub fn gif(link: String) -> DownloadsResult {
         Arg::new_with_arg("--format", "bv"),
     ];
     let filetype = FileType::Gif;
-    let downloaded = dl(link, args, filetype)?;
+    let downloaded = dl(url, args, filetype)?;
     Ok(downloaded)
 }
 
-fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
-    trace!("Downloading {}(s) from {} ...", filetype.as_str(), link);
+fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
+    trace!("Downloading {}(s) from {} ...", filetype.as_str(), url);
     // UUID is used because thats my choice.
     let destination_basename = Uuid::new_v4();
     let relative_destination_path = &format!("./downloads/{}", destination_basename)[..];
     let path = PathBuf::from(relative_destination_path);
-    let ytd = YoutubeDL::new(&path, args, &link)?;
+    let ytd = YoutubeDL::new(&path, args, &url)?;
     let _ = ytd.download()?;
     let mut paths: Vec<PathBuf> = Vec::new();
     let regex = Regex::new(r"(.*)(\.opus)").unwrap();
@@ -147,13 +148,14 @@ fn dl(link: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     let file_amount = paths.len();
     trace!("{} {}(s) to send", file_amount, filetype.as_str());
     if file_amount == 0 {
-        cleanup(vec![PathBuf::from(relative_destination_path)]);
+        cleanup(relative_destination_path.into());
     }
     let tg_files = paths.iter().map(|file| InputFile::file(&file)).collect();
-    let subject = Downloads {
+    let downloads = Downloads {
         filetype,
         botfiles: tg_files,
         paths,
+        folder: relative_destination_path.into(),
     };
-    Ok(subject)
+    Ok(downloads)
 }

@@ -13,6 +13,7 @@ use teloxide::{
     dispatching::UpdateHandler, prelude::*, update_listeners::webhooks, utils::command::BotCommands,
 };
 use tokio::task;
+use crate::misc::url_is_valid;
 
 type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
 
@@ -92,10 +93,10 @@ async fn handler() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 's
     let command_handler = teloxide::filter_command::<Command, _>()
         .branch(case![Command::Start].endpoint(start))
         .branch(case![Command::Help].endpoint(help))
-        .branch(case![Command::Mp3(link)].endpoint(mp3))
-        .branch(case![Command::Mp4(link)].endpoint(mp4))
-        .branch(case![Command::Voice(link)].endpoint(voice))
-        .branch(case![Command::Gif(link)].endpoint(gif))
+        .branch(case![Command::Mp3(url)].endpoint(mp3))
+        .branch(case![Command::Mp4(url)].endpoint(mp4))
+        .branch(case![Command::Voice(url)].endpoint(voice))
+        .branch(case![Command::Gif(url)].endpoint(gif))
         .branch(case![Command::C].endpoint(clear));
 
     let message_handler = Update::filter_message().branch(command_handler);
@@ -125,27 +126,27 @@ async fn help(bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResul
     Ok(())
 }
 
-async fn mp3(link: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
+async fn mp3(url: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Mp3;
-    process_request(link, filetype, &bot, msg_from_user, &db).await?;
+    process_request(url, filetype, &bot, msg_from_user, &db).await?;
     Ok(())
 }
 
-async fn mp4(link: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
+async fn mp4(url: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Mp4;
-    process_request(link, filetype, &bot, msg_from_user, &db).await?;
+    process_request(url, filetype, &bot, msg_from_user, &db).await?;
     Ok(())
 }
 
-async fn voice(link: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
+async fn voice(url: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Voice;
-    process_request(link, filetype, &bot, msg_from_user, &db).await?;
+    process_request(url, filetype, &bot, msg_from_user, &db).await?;
     Ok(())
 }
 
-async fn gif(link: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
+async fn gif(url: String, bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResult {
     let filetype = FileType::Gif;
-    process_request(link, filetype, &bot, msg_from_user, &db).await?;
+    process_request(url, filetype, &bot, msg_from_user, &db).await?;
     Ok(())
 }
 
@@ -175,10 +176,6 @@ fn getuser(msg_from_user: &Message) -> String {
     return username;
 }
 
-fn link_is_valid(link: &str) -> bool {
-    link.len() != 0
-}
-
 async fn purge_trash_messages(
     chat_id: ChatId,
     db: &Surreal<Db>,
@@ -198,20 +195,20 @@ async fn purge_trash_messages(
     Ok(())
 }
 
-async fn process_request(link: String, filetype: FileType, bot: &Bot, msg_from_user: Message, db: &Surreal<Db>) -> HandlerResult {
+async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_user: Message, db: &Surreal<Db>) -> HandlerResult {
     let chat_id = msg_from_user.chat.id;
     let msg_id = msg_from_user.id;
     let username = getuser(&msg_from_user);
     database::intodb(chat_id, msg_id, &db).await?;
-    if link_is_valid(&link) {
+    if url_is_valid(&url) {
         send_and_remember_msg(&bot, chat_id, db, "Please wait ...").await?;
         info!("User @{} asked for /{}.", &username, filetype.as_str());
         // The clone is moved into pirate module for error reporting.
         let downloads_result = match &filetype {
-            FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(link)).await,
-            FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(link)).await,
-            FileType::Voice => task::spawn_blocking(move || pirate::ogg(link)).await,
-            FileType::Gif => task::spawn_blocking(move || pirate::gif(link)).await,
+            FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(url)).await,
+            FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(url)).await,
+            FileType::Voice => task::spawn_blocking(move || pirate::ogg(url)).await,
+            FileType::Gif => task::spawn_blocking(move || pirate::gif(url)).await,
         }?;
 
         match downloads_result {
@@ -240,7 +237,7 @@ async fn process_request(link: String, filetype: FileType, bot: &Bot, msg_from_u
                     }
                     info!("Files have been delivered to @{}.", &username);
                     purge_trash_messages(chat_id, db, &bot).await?;
-                    cleanup(files.paths);
+                    cleanup(files.folder);
                 } else {
                     let error_text = "This is an error. For some reason I haven't downloaded any files.";
                     warn!("{}", error_text);
