@@ -4,7 +4,7 @@ use surrealdb::{engine::local::Db, engine::local::File, Surreal};
 use teloxide::types::{ChatId, MessageId};
 
 pub async fn initialize() -> Surreal<Db> {
-    info!("Initializing database ...");
+    debug!("Initializing database ...");
     let db_result = Surreal::new::<File>("./surrealdb").await;
     match db_result {
         Ok(db) => {

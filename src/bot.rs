@@ -12,6 +12,7 @@ use teloxide::types::ChatKind;
 use teloxide::{
     dispatching::UpdateHandler, prelude::*, update_listeners::webhooks, utils::command::BotCommands,
 };
+use teloxide::types::InputFile;
 use tokio::task;
 use crate::misc::url_is_valid;
 
@@ -196,6 +197,7 @@ async fn purge_trash_messages(
 }
 
 async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_user: Message, db: &Surreal<Db>) -> HandlerResult {
+    debug!("Processing request ...");
     let chat_id = msg_from_user.chat.id;
     let msg_id = msg_from_user.id;
     let username = getuser(&msg_from_user);
@@ -217,9 +219,11 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
                 send_and_remember_msg(&bot, chat_id, &db, &error.to_string()).await?;
             }
             Ok(files) => {
-                if files.botfiles.len() != 0 {
-                    for file in files.botfiles.into_iter() {
-                        trace!("Sending {} to @{} ...", filetype.as_str(), &username);
+                if files.paths.len() != 0 {
+                    for path in files.paths.into_iter() {
+                        let file = InputFile::file(&path);
+                        let filename = path.to_str().unwrap();
+                        trace!("Sending {} to @{} ...", filename, &username);
                         match &filetype {
                             FileType::Mp3 => {
                                 bot.send_audio(msg_from_user.chat.id, file).await?;

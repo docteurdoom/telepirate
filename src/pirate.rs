@@ -5,7 +5,6 @@ use regex::Regex;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use teloxide::types::InputFile;
 use ytd_rs::{Arg, YoutubeDL};
 use uuid::Uuid;
 
@@ -14,7 +13,6 @@ type DownloadsResult = Result<Downloads, Box<dyn Error + Send + Sync>>;
 #[derive(Default, Debug, Clone)]
 pub struct Downloads {
     pub filetype: FileType,
-    pub botfiles: Vec<InputFile>,
     pub paths: Vec<PathBuf>,
     pub folder: PathBuf,
 }
@@ -146,14 +144,12 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
         }
     }
     let file_amount = paths.len();
-    trace!("{} {}(s) to send", file_amount, filetype.as_str());
+    info!("{} {}(s) to send.", file_amount, filetype.as_str());
     if file_amount == 0 {
         cleanup(relative_destination_path.into());
     }
-    let tg_files = paths.iter().map(|file| InputFile::file(&file)).collect();
     let downloads = Downloads {
         filetype,
-        botfiles: tg_files,
         paths,
         folder: relative_destination_path.into(),
     };
