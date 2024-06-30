@@ -1,5 +1,6 @@
+use crate::misc::url_is_valid;
 use crate::{
-    database::{self, delete_trash_from_chat},
+    database::{self, forget_deleted_messages},
     misc::{cleanup, sleep},
     pirate::{self, FileType},
 };
@@ -9,12 +10,11 @@ use std::error::Error;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 use teloxide::types::ChatKind;
+use teloxide::types::InputFile;
 use teloxide::{
     dispatching::UpdateHandler, prelude::*, update_listeners::webhooks, utils::command::BotCommands,
 };
-use teloxide::types::InputFile;
 use tokio::task;
-use crate::misc::url_is_valid;
 
 type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
 
@@ -83,7 +83,6 @@ async fn dispatcher(bot: Bot, db: Surreal<Db>) {
         .default_handler(|upd| async move {
             warn!("Unhandled update: {:?}", upd);
         })
-        .error_handler(LoggingErrorHandler::with_custom_text("Handler error."))
         .build()
         .dispatch()
         .await;
@@ -191,11 +190,17 @@ async fn purge_trash_messages(
             _ => {}
         }
     }
-    delete_trash_from_chat(chat_id, db).await?;
+    forget_deleted_messages(chat_id, db).await?;
     Ok(())
 }
 
-async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_user: Message, db: &Surreal<Db>) -> HandlerResult {
+async fn process_request(
+    url: String,
+    filetype: FileType,
+    bot: &Bot,
+    msg_from_user: Message,
+    db: &Surreal<Db>,
+) -> HandlerResult {
     debug!("Processing request ...");
     let chat_id = msg_from_user.chat.id;
     let msg_id = msg_from_user.id;
@@ -217,46 +222,40 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
                 send_and_remember_msg(&bot, chat_id, &db, &error.to_string()).await;
             }
             Ok(files) => {
-                if files.paths.len() != 0 {
-                    for path in files.paths.into_iter() {
-                        let file = InputFile::file(&path);
-                        let filename = path.file_name().unwrap().to_str().unwrap();
-                        trace!("Sending {} to @{} ...", filename, &username);
-                        match &filetype {
-                            FileType::Mp3 => {
-                                if let Err(error) = bot.send_audio(chat_id, file).await {
-                                    let error_text = format!("{}", error);
-                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
-                                }
+                for path in files.paths.into_iter() {
+                    let file = InputFile::file(&path);
+                    let filename = path.file_name().unwrap().to_str().unwrap();
+                    trace!("Sending {} to @{} ...", filename, &username);
+                    match &filetype {
+                        FileType::Mp3 => {
+                            if let Err(error) = bot.send_audio(chat_id, file).await {
+                                let error_text = format!("{}", error);
+                                send_and_remember_msg(bot, chat_id, db, &error_text).await;
                             }
-                            FileType::Mp4 => {
-                                if let Err(error) = bot.send_video(chat_id, file).await {
-                                    let error_text = format!("{}", error);
-                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
-                                }
+                        }
+                        FileType::Mp4 => {
+                            if let Err(error) = bot.send_video(chat_id, file).await {
+                                let error_text = format!("{}", error);
+                                send_and_remember_msg(bot, chat_id, db, &error_text).await;
                             }
-                            FileType::Voice => {
-                                if let Err(error) = bot.send_voice(chat_id, file).await {
-                                    let error_text = format!("{}", error);
-                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
-                                }
+                        }
+                        FileType::Voice => {
+                            if let Err(error) = bot.send_voice(chat_id, file).await {
+                                let error_text = format!("{}", error);
+                                send_and_remember_msg(bot, chat_id, db, &error_text).await;
                             }
-                            FileType::Gif => {
-                                if let Err(error) = bot.send_animation(chat_id, file).await {
-                                    let error_text = format!("{}", error);
-                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
-                                }
+                        }
+                        FileType::Gif => {
+                            if let Err(error) = bot.send_animation(chat_id, file).await {
+                                let error_text = format!("{}", error);
+                                send_and_remember_msg(bot, chat_id, db, &error_text).await;
                             }
                         }
                     }
-                    info!("Files have been delivered to @{}.", &username);
-                    purge_trash_messages(chat_id, db, &bot).await?;
-                    cleanup(files.folder);
-                } else {
-                    let error_text = "This is an error. Most likely the file is too large.";
-                    warn!("{}", error_text);
-                    send_and_remember_msg(&bot, chat_id, db, error_text).await;
                 }
+                info!("Files have been delivered to @{}.", &username);
+                purge_trash_messages(chat_id, db, &bot).await?;
+                cleanup(files.folder);
             }
         }
     } else {

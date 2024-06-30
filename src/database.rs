@@ -41,11 +41,11 @@ pub async fn get_trash_message_ids(
     Ok(message_ids)
 }
 
-pub async fn delete_trash_from_chat(
+pub async fn forget_deleted_messages(
     chat_id: ChatId,
     db: &Surreal<Db>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    trace!("Cleaning up the database for chat ID {} ...", chat_id.0);
+    trace!("Forgetting deleted messages for Chat {} ...", chat_id.0);
     let _: Vec<MessageId> = db.delete(chat_id.to_string()).await?;
     Ok(())
 }

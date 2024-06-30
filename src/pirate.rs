@@ -5,8 +5,9 @@ use regex::Regex;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use ytd_rs::{Arg, YoutubeDL};
 use uuid::Uuid;
+use ytd_rs::{Arg, YoutubeDL};
+use crate::FILE_STORAGE;
 
 type DownloadsResult = Result<Downloads, Box<dyn Error + Send + Sync>>;
 
@@ -107,7 +108,8 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), url);
     // UUID is used because thats my choice.
     let destination_basename = Uuid::new_v4();
-    let absolute_destination_path = &format!("/tmp/telepirate-downloads/{}", destination_basename)[..];
+    let absolute_destination_path =
+        &format!("{}/{}", FILE_STORAGE, destination_basename)[..];
     let path = PathBuf::from(absolute_destination_path);
     let ytd = YoutubeDL::new(&path, args, &url)?;
     let _ = ytd.download()?;
@@ -121,10 +123,10 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     for entry in filepaths {
         match entry {
             Ok(mut file_path) => {
+                let filename = file_path.to_str().unwrap();
                 // Telegram allows bots sending only files under 50 MB.
                 let filesize = file_path.metadata()?.len();
                 if filesize < 50_000_000 {
-                    let filename = file_path.to_str().unwrap();
                     // Rename .opus into .ogg because Telegram requires so to display wave pattern.
                     if let Some(captures) = regex.captures(filename) {
                         let oldname = captures.get(0).unwrap().as_str();
@@ -133,11 +135,14 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
                             .replace(":", "-")
                             .replace("T", "_")
                             .replace("Z", "");
-                        let newname = format!("{}/audio_{}.ogg", absolute_destination_path, timestamp);
+                        let newname =
+                            format!("{}/audio_{}.ogg", absolute_destination_path, timestamp);
                         std::fs::rename(oldname, &newname)?;
                         file_path = PathBuf::from(newname);
                     }
                     paths.push(file_path);
+                } else {
+                    trace!("Skipping large file {}", filename);
                 }
             }
             _ => {}
@@ -147,6 +152,8 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     info!("{} {}(s) to send.", file_amount, filetype.as_str());
     if file_amount == 0 {
         cleanup(absolute_destination_path.into());
+        let error_text = "Files larger than 50 MB are not allowed.";
+        return Err(error_text.into());
     }
     let downloads = Downloads {
         filetype,

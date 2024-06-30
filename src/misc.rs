@@ -1,10 +1,12 @@
 use std::fs::remove_dir_all;
+use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::thread;
 use std::time;
 use validators::prelude::*;
 use validators::url::Url;
-use std::io::{Write, stdout};
+
+use crate::FILE_STORAGE;
 
 #[derive(Validator)]
 #[validator(http_url(local(Allow)))]
@@ -14,7 +16,10 @@ pub struct HttpURL {
 }
 
 pub fn cleanup(absolute_destination_path: PathBuf) {
-    debug!("Deleting the working directory {} ...", absolute_destination_path.to_str().unwrap());
+    debug!(
+        "Deleting the working directory {} ...",
+        absolute_destination_path.to_str().unwrap()
+    );
     remove_dir_all(absolute_destination_path).unwrap();
 }
 
@@ -25,6 +30,7 @@ pub fn update() {
 pub fn boot() {
     use crate::logger;
     logger::init();
+    cleanup(FILE_STORAGE.into());
     checkdep("yt-dlp");
     checkdep("ffmpeg");
     let _ = ctrlc::set_handler(move || {
