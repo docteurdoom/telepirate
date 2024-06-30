@@ -107,16 +107,16 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     trace!("Downloading {}(s) from {} ...", filetype.as_str(), url);
     // UUID is used because thats my choice.
     let destination_basename = Uuid::new_v4();
-    let relative_destination_path = &format!("./downloads/{}", destination_basename)[..];
-    let path = PathBuf::from(relative_destination_path);
+    let absolute_destination_path = &format!("/tmp/telepirate-downloads/{}", destination_basename)[..];
+    let path = PathBuf::from(absolute_destination_path);
     let ytd = YoutubeDL::new(&path, args, &url)?;
     let _ = ytd.download()?;
     let mut paths: Vec<PathBuf> = Vec::new();
     let regex = Regex::new(r"(.*)(\.opus)").unwrap();
     let fileformat = filetype.as_str();
     let filepaths = match filetype {
-        FileType::Gif => glob(&format!("{}/*mp4", relative_destination_path))?,
-        _ => glob(&format!("{}/*{}", relative_destination_path, fileformat))?,
+        FileType::Gif => glob(&format!("{}/*mp4", absolute_destination_path))?,
+        _ => glob(&format!("{}/*{}", absolute_destination_path, fileformat))?,
     };
     for entry in filepaths {
         match entry {
@@ -133,7 +133,7 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
                             .replace(":", "-")
                             .replace("T", "_")
                             .replace("Z", "");
-                        let newname = format!("{}/audio_{}.ogg", relative_destination_path, timestamp);
+                        let newname = format!("{}/audio_{}.ogg", absolute_destination_path, timestamp);
                         std::fs::rename(oldname, &newname)?;
                         file_path = PathBuf::from(newname);
                     }
@@ -146,12 +146,12 @@ fn dl(url: String, args: Vec<Arg>, filetype: FileType) -> DownloadsResult {
     let file_amount = paths.len();
     info!("{} {}(s) to send.", file_amount, filetype.as_str());
     if file_amount == 0 {
-        cleanup(relative_destination_path.into());
+        cleanup(absolute_destination_path.into());
     }
     let downloads = Downloads {
         filetype,
         paths,
-        folder: relative_destination_path.into(),
+        folder: absolute_destination_path.into(),
     };
     Ok(downloads)
 }

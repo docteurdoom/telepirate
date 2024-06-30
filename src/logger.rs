@@ -41,5 +41,5 @@ pub fn init() {
         .chain(fern::log_file("debug.log").unwrap())
         .apply()
         .unwrap();
-    trace!("Logging framework has been initialized.");
+    info!("Started up.");
 }

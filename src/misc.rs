@@ -4,6 +4,7 @@ use std::thread;
 use std::time;
 use validators::prelude::*;
 use validators::url::Url;
+use std::io::{Write, stdout};
 
 #[derive(Validator)]
 #[validator(http_url(local(Allow)))]
@@ -12,9 +13,13 @@ pub struct HttpURL {
     is_https: bool,
 }
 
-pub fn cleanup(relative_destination_path: PathBuf) {
-    debug!("Deleting the working directory ...");
-    remove_dir_all(relative_destination_path).unwrap();
+pub fn cleanup(absolute_destination_path: PathBuf) {
+    debug!("Deleting the working directory {} ...", absolute_destination_path.to_str().unwrap());
+    remove_dir_all(absolute_destination_path).unwrap();
+}
+
+pub fn update() {
+    stdout().flush().unwrap();
 }
 
 pub fn boot() {
@@ -22,6 +27,11 @@ pub fn boot() {
     logger::init();
     checkdep("yt-dlp");
     checkdep("ffmpeg");
+    let _ = ctrlc::set_handler(move || {
+        info!("Stopping ...");
+        update();
+        std::process::exit(0);
+    });
 }
 
 fn checkdep(dep: &str) {

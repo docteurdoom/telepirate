@@ -79,7 +79,6 @@ pub async fn run() {
 
 async fn dispatcher(bot: Bot, db: Surreal<Db>) {
     Dispatcher::builder(bot, handler().await)
-        .enable_ctrlc_handler()
         .dependencies(dptree::deps![db])
         .default_handler(|upd| async move {
             warn!("Unhandled update: {:?}", upd);
@@ -110,7 +109,7 @@ async fn start(bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResu
     let msg_id = msg_from_user.id;
     let username = getuser(&msg_from_user);
     let command_descriptions = Command::descriptions().to_string();
-    send_and_remember_msg(&bot, chat_id, &db, &command_descriptions).await?;
+    send_and_remember_msg(&bot, chat_id, &db, &command_descriptions).await;
     database::intodb(chat_id, msg_id, &db).await?;
     info!("User @{} has /start'ed the bot.", username);
     Ok(())
@@ -121,7 +120,7 @@ async fn help(bot: Bot, msg_from_user: Message, db: Surreal<Db>) -> HandlerResul
     let msg_id = msg_from_user.id;
     let username = getuser(&msg_from_user);
     let command_descriptions = Command::descriptions().to_string();
-    send_and_remember_msg(&bot, chat_id, &db, &command_descriptions).await?;
+    send_and_remember_msg(&bot, chat_id, &db, &command_descriptions).await;
     database::intodb(chat_id, msg_id, &db).await?;
     info!("User @{} asked for /help.", username);
     Ok(())
@@ -203,9 +202,8 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
     let username = getuser(&msg_from_user);
     database::intodb(chat_id, msg_id, &db).await?;
     if url_is_valid(&url) {
-        send_and_remember_msg(&bot, chat_id, db, "Please wait ...").await?;
+        send_and_remember_msg(&bot, chat_id, db, "Please wait ...").await;
         info!("User @{} asked for /{}.", &username, filetype.as_str());
-        // The clone is moved into pirate module for error reporting.
         let downloads_result = match &filetype {
             FileType::Mp3 => task::spawn_blocking(move || pirate::mp3(url)).await,
             FileType::Mp4 => task::spawn_blocking(move || pirate::mp4(url)).await,
@@ -216,26 +214,38 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
         match downloads_result {
             Err(error) => {
                 warn!("{}", error);
-                send_and_remember_msg(&bot, chat_id, &db, &error.to_string()).await?;
+                send_and_remember_msg(&bot, chat_id, &db, &error.to_string()).await;
             }
             Ok(files) => {
                 if files.paths.len() != 0 {
                     for path in files.paths.into_iter() {
                         let file = InputFile::file(&path);
-                        let filename = path.to_str().unwrap();
+                        let filename = path.file_name().unwrap().to_str().unwrap();
                         trace!("Sending {} to @{} ...", filename, &username);
                         match &filetype {
                             FileType::Mp3 => {
-                                bot.send_audio(msg_from_user.chat.id, file).await?;
+                                if let Err(error) = bot.send_audio(chat_id, file).await {
+                                    let error_text = format!("{}", error);
+                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
+                                }
                             }
                             FileType::Mp4 => {
-                                bot.send_video(msg_from_user.chat.id, file).await?;
+                                if let Err(error) = bot.send_video(chat_id, file).await {
+                                    let error_text = format!("{}", error);
+                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
+                                }
                             }
                             FileType::Voice => {
-                                bot.send_voice(msg_from_user.chat.id, file).await?;
+                                if let Err(error) = bot.send_voice(chat_id, file).await {
+                                    let error_text = format!("{}", error);
+                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
+                                }
                             }
                             FileType::Gif => {
-                                bot.send_animation(msg_from_user.chat.id, file).await?;
+                                if let Err(error) = bot.send_animation(chat_id, file).await {
+                                    let error_text = format!("{}", error);
+                                    send_and_remember_msg(bot, chat_id, db, &error_text).await;
+                                }
                             }
                         }
                     }
@@ -243,9 +253,9 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
                     purge_trash_messages(chat_id, db, &bot).await?;
                     cleanup(files.folder);
                 } else {
-                    let error_text = "This is an error. For some reason I haven't downloaded any files.";
+                    let error_text = "This is an error. Most likely the file is too large.";
                     warn!("{}", error_text);
-                    send_and_remember_msg(&bot, chat_id, db, error_text).await?;
+                    send_and_remember_msg(&bot, chat_id, db, error_text).await;
                 }
             }
         }
@@ -262,14 +272,22 @@ async fn process_request(url: String, filetype: FileType, bot: &Bot, msg_from_us
                 format!("Correct usage:\n\n/{} https://valid_{}_url", ftype, ftype)
             }
         };
-        send_and_remember_msg(&bot, chat_id, db, &correct_usage).await?;
+        send_and_remember_msg(&bot, chat_id, db, &correct_usage).await;
         debug!("Reminded user @{} of a correct /{} usage.", username, ftype);
     }
     Ok(())
 }
 
-pub async fn send_and_remember_msg(bot: &Bot, chat_id: ChatId, db: &Surreal<Db>, text: &str) -> HandlerResult {
-    let message = bot.send_message(chat_id, text).await?;
-    database::intodb(chat_id, message.id, &db).await?;
-    Ok(())
+pub async fn send_and_remember_msg(bot: &Bot, chat_id: ChatId, db: &Surreal<Db>, text: &str) {
+    let message_result = bot.send_message(chat_id, text).await;
+    match message_result {
+        Ok(message) => {
+            if let Err(db_error) = database::intodb(chat_id, message.id, &db).await {
+                warn!("Failed to record a message into DB: {}", db_error);
+            }
+        }
+        Err(msg_error) => {
+            warn!("Failed to send message: {}", msg_error);
+        }
+    }
 }
