@@ -6,8 +6,6 @@ use std::time;
 use validators::prelude::*;
 use validators::url::Url;
 
-use crate::FILE_STORAGE;
-
 #[derive(Validator)]
 #[validator(http_url(local(Allow)))]
 pub struct HttpURL {
@@ -30,7 +28,6 @@ pub fn update() {
 pub fn boot() {
     use crate::logger;
     logger::init();
-    cleanup(FILE_STORAGE.into());
     checkdep("yt-dlp");
     checkdep("ffmpeg");
     let _ = ctrlc::set_handler(move || {
