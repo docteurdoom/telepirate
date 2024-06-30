@@ -1,11 +1,11 @@
 use crate::CRATE_NAME;
 use std::error::Error;
-use surrealdb::{engine::local::Db, engine::local::File, Surreal};
+use surrealdb::{engine::local::Db, engine::local::Mem, Surreal};
 use teloxide::types::{ChatId, MessageId};
 
 pub async fn initialize() -> Surreal<Db> {
     debug!("Initializing database ...");
-    let db_result = Surreal::new::<File>("./surrealdb").await;
+    let db_result = Surreal::new::<Mem>(()).await;
     match db_result {
         Ok(db) => {
             db.use_ns(CRATE_NAME).use_db(CRATE_NAME).await.unwrap();
