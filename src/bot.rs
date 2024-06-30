@@ -272,12 +272,12 @@ async fn process_request(
             }
         };
         send_and_remember_msg(&bot, chat_id, db, &correct_usage).await;
-        debug!("Reminded user @{} of a correct /{} usage.", username, ftype);
+        info!("Reminded user @{} of a correct /{} usage.", username, ftype);
     }
     Ok(())
 }
 
-pub async fn send_and_remember_msg(bot: &Bot, chat_id: ChatId, db: &Surreal<Db>, text: &str) {
+async fn send_and_remember_msg(bot: &Bot, chat_id: ChatId, db: &Surreal<Db>, text: &str) {
     let message_result = bot.send_message(chat_id, text).await;
     match message_result {
         Ok(message) => {
